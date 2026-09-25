@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { api, type UserRow } from '../api.ts';
+import { api, apiPostForBytes, type UserRow } from '../api.ts';
 import { useApp } from '../App.tsx';
 import { Card, Chip, ErrorBanner, Field, SuccessBanner, confirmAction } from '../components.tsx';
 import { phoneKe } from '../format.ts';
@@ -20,6 +20,13 @@ export default function Settings() {
 
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState<'MANAGER' | 'CARETAKER'>('CARETAKER');
+
+  const [exportPass, setExportPass] = useState('');
+  const [exportPass2, setExportPass2] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [restorePass, setRestorePass] = useState('');
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -77,7 +84,7 @@ export default function Settings() {
 
   async function resetDemo(): Promise<void> {
     if (!confirmAction(
-      'Erase this device\'s books and start over?\n\nAll properties, tenants, payments and receipts on this device are removed. (Demo reset — in the shipped app this is a passphrase-protected restore.)',
+      'Erase this device\'s books and start over?\n\nAll properties, tenants, payments and receipts on this device are removed. (Demo reset — to move your books to a new device, use the encrypted backup above.)',
     )) return;
     try {
       await api('/api/reset');
@@ -85,6 +92,61 @@ export default function Settings() {
       window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not reset.');
+    }
+  }
+
+  async function exportBackup(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    try {
+      setExporting(true);
+      const { bytes, filename } = await apiPostForBytes('/api/backup/export', { passphrase: exportPass });
+      const blob = new Blob([bytes as BlobPart], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename ?? 'kitabu-backup.kitabu';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setNotice('Encrypted backup downloaded. Keep the file and the passphrase somewhere safe — together they restore your books on any device.');
+      setExportPass('');
+      setExportPass2('');
+      await refreshState();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create the backup.');
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function restoreBackup(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    if (restoreFile === null) {
+      setError('Choose the backup file to restore from.');
+      return;
+    }
+    if (!confirmAction(
+      'Restore from this backup?\n\nThe books currently on this device are replaced by the backup. The passphrase is checked first — nothing changes if it does not match.',
+    )) return;
+    try {
+      setRestoring(true);
+      const buffer = new Uint8Array(await restoreFile.arrayBuffer());
+      let binary = '';
+      for (let i = 0; i < buffer.length; i += 0x8000) {
+        binary += String.fromCharCode(...buffer.subarray(i, i + 0x8000));
+      }
+      const backupBase64 = btoa(binary);
+      await api('/api/backup/restore', { body: { passphrase: restorePass, backupBase64 } });
+      window.localStorage.removeItem('kitabu.actingUser');
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not restore the backup.');
+      setRestoring(false);
     }
   }
 
@@ -151,6 +213,53 @@ export default function Settings() {
           Roles are enforced by the books themselves, not the screen: caretakers record payments and tenants;
           only the owner verifies M-Pesa codes, issues receipts and changes rent.
         </p>
+      </Card>
+
+      <Card title="Backup & restore">
+        <p className="field-hint">
+          One encrypted file holds your whole books — houses, tenants, payments, receipts, audit trail.
+          If this laptop or phone is lost, the file plus the passphrase restores everything on a new device.
+        </p>
+        {isOwner ? (
+          <>
+            <dl className="kv">
+              <dt>Last backup</dt>
+              <dd>{state?.lastBackupAt != null ? new Date(state.lastBackupAt).toLocaleString() : 'Never — no backup on this device yet'}</dd>
+            </dl>
+            <form onSubmit={(e) => void exportBackup(e)} className="form-grid" style={{ marginTop: 12 }}>
+              <Field label="Backup passphrase" hint="At least 8 characters. Needed to restore — Kitabu never stores it.">
+                <input type="password" value={exportPass} onChange={(e) => setExportPass(e.target.value)} autoComplete="new-password" />
+              </Field>
+              <Field label="Repeat passphrase">
+                <input type="password" value={exportPass2} onChange={(e) => setExportPass2(e.target.value)} autoComplete="new-password" />
+              </Field>
+              <div className="form-row" style={{ gridColumn: '1 / -1' }}>
+                <button
+                  className="btn-primary"
+                  type="submit"
+                  disabled={exporting || exportPass.length < 8 || exportPass !== exportPass2}
+                >
+                  {exporting ? 'Encrypting…' : 'Download encrypted backup'}
+                </button>
+              </div>
+            </form>
+            <form onSubmit={(e) => void restoreBackup(e)} className="form-grid" style={{ marginTop: 18 }}>
+              <Field label="Restore from backup file" hint="Replaces the books on this device after the passphrase is verified.">
+                <input type="file" accept=".kitabu,application/octet-stream" onChange={(e) => setRestoreFile(e.target.files?.[0] ?? null)} />
+              </Field>
+              <Field label="Backup passphrase">
+                <input type="password" value={restorePass} onChange={(e) => setRestorePass(e.target.value)} autoComplete="off" />
+              </Field>
+              <div className="form-row" style={{ gridColumn: '1 / -1' }}>
+                <button className="btn-danger" type="submit" disabled={restoring || restoreFile === null || restorePass === ''}>
+                  {restoring ? 'Restoring…' : 'Restore books from backup'}
+                </button>
+              </div>
+            </form>
+          </>
+        ) : (
+          <p className="field-hint">Only the owner can export or restore backups.</p>
+        )}
       </Card>
 
       <Card title="This device">

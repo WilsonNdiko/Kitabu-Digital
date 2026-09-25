@@ -52,9 +52,14 @@ dashboard, properties, tenants + statements, ≤5-tap record-payment, M-Pesa
 verification queue, printable signed receipts, settings/team) on `apps/local-api`
 (zero-dep local server hosting the real core; the Electron-main stand-in).
 Role matrix from SECURITY.md §3 now enforced in the core services and locked by
-`packages/core/test/roles.test.ts`. **125/125 tests green.**
-Remaining: Electron + React Native wrappers, PIN unlock, encrypted backup,
-receipt PDF template.
+`packages/core/test/roles.test.ts`. **Local encrypted backup export/restore
+shipped (FR-22/NFR-09):** AES-256-GCM archive keyed by Argon2id(passphrase)
+(both vendored in core, RFC 9106/7693 vectors green — zero dependencies),
+snapshot = all live rows of the 17 synced tables + schema version (SYNC.md §6),
+owner-only export, passphrase verified *before* any database is replaced,
+Settings screen card, device-loss walkthrough proven over HTTP (receipt
+signatures verify after restore). **146/146 tests green.**
+Remaining: Electron + React Native wrappers, PIN unlock, receipt PDF template.
 
 **Exit:** "Green View" single-device walkthrough on Windows + Android fully offline;
 NFR-02/03/04/12 measured.

@@ -57,6 +57,27 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   return payload as T;
 }
 
+/** POST JSON, expect a binary attachment back (backup export). */
+export async function apiPostForBytes(path: string, body: unknown): Promise<{ bytes: Uint8Array; filename: string | null }> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  const acting = actingUserHeader();
+  if (acting !== null) headers['x-acting-user'] = acting;
+  const res = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!res.ok) {
+    let payload: unknown = null;
+    try { payload = await res.json(); } catch { /* non-JSON */ }
+    const err = payload as { error?: { code?: string; message?: string } } | null;
+    throw new ApiError(
+      res.status,
+      err?.error?.code ?? 'NETWORK',
+      err?.error?.message ?? 'Kitabu could not reach this device\'s books. Check the connection and try again.',
+    );
+  }
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const match = /filename="([^"]+)"/.exec(disposition);
+  return { bytes: new Uint8Array(await res.arrayBuffer()), filename: match?.[1] ?? null };
+}
+
 // -- shared payload types (snake_case rows, as the core returns them) ----------------
 
 export interface UserRow {
@@ -81,6 +102,7 @@ export interface OrgState {
   users?: UserRow[];
   actingUserId?: string | null;
   today?: string;
+  lastBackupAt?: string | null;
 }
 
 export interface PropertyWithCounts {

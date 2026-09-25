@@ -14,7 +14,7 @@ and multi-device sync that **never** requires internet for core operation.
 | M0 | Architecture & design package | ✅ complete (`docs/`) |
 | M1 | Core foundation — local DB, ids/HLC/money, org/property/tenant/tenancy services, audit + op-log | ✅ complete |
 | M2 | Financial core (ledger, payments, arrears, receipts) | ✅ complete |
-| M3 | App shells — web UI + local API done; Electron/RN next | 🚧 in progress — **125/125 tests green** |
+| M3 | App shells — web UI + local API + encrypted backup done; Electron/RN next | 🚧 in progress — **146/146 tests green** |
 | M4+ | Operations, local sync, cloud, M-Pesa, AI | see [docs/ROADMAP.md](docs/ROADMAP.md) |
 
 ## Architecture in one paragraph
@@ -36,9 +36,11 @@ packages/core/      @kitabu/core — shared core (pure TypeScript, zero deps)
   src/db/           SqlitePort · schema v1+v2 + migrations · Node adapter (node:sqlite)
   src/domain/       Row types & enums (schema mirror)
   src/foundation/   … + sha256/base64/canonical JSON · amounts-in-words (Kiswahili-ready)
+                    · blake2b (RFC 7693) · argon2id (RFC 9106) — vendored, vector-tested
   src/services/     Organization · Property · Tenant · Tenancy · Audit · op-log recorder
                     · Ledger · Payment · Receipt (Ed25519-signed, immutable)
-  test/             18 core suites + local-api suite — 125 tests (node:test, zero-dep)
+                    · Backup (AES-256-GCM archive, Argon2id passphrase KDF)
+  test/             21 core suites + local-api suites — 146 tests (node:test, zero-dep)
 apps/web/           Web shell — the screens (React; becomes the Electron renderer)
 apps/local-api/     Local API — zero-dep node:http server hosting the core (app backend)
 server/             Cloud API (M6: NestJS + PostgreSQL)

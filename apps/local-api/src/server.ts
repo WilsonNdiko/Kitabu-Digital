@@ -17,8 +17,11 @@ import { readFile, stat } from 'node:fs/promises';
 import { rmSync } from 'node:fs';
 import { join, extname, normalize } from 'node:path';
 
-import { openKitabuFile, openKitabuInMemory } from '../../../packages/core/src/node.ts';
-import type { Kitabu, KitabuServices } from '../../../packages/core/src/kitabu.ts';
+import { openKitabuFile, openKitabuInMemory, openNodeSqlite, NodeCryptoPort } from '../../../packages/core/src/node.ts';
+import { Kitabu } from '../../../packages/core/src/kitabu.ts';
+import type { KitabuServices } from '../../../packages/core/src/kitabu.ts';
+import { readBackup } from '../../../packages/core/src/services/backup.ts';
+import { base64ToBytes } from '../../../packages/core/src/foundation/base64.ts';
 import { KitabuError } from '../../../packages/core/src/foundation/errors.ts';
 import type { ArrearsRow, MonthStatus } from '../../../packages/core/src/services/ledger.ts';
 import type { PaymentRow, UnitKind } from '../../../packages/core/src/domain/types.ts';
@@ -92,7 +95,8 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
   let size = 0;
   for await (const chunk of req) {
     size += (chunk as Buffer).length;
-    if (size > 1_000_000) throw new KitabuError('VALIDATION', 'That request is too large.');
+    // Generous cap: backup restore carries the whole database as base64 JSON.
+    if (size > 50_000_000) throw new KitabuError('VALIDATION', 'That request is too large.');
     chunks.push(chunk as Buffer);
   }
   if (chunks.length === 0) return {};
@@ -240,10 +244,24 @@ function statePayload(ctx: Ctx): Record<string, unknown> {
     users: services(ctx).organization.listUsers(),
     actingUserId: ctx.kitabu.actingUserId,
     today: new Date().toISOString().slice(0, 10),
+    lastBackupAt: ctx.kitabu.localSetting('backup.last_exported_at'),
   };
 }
 
 // -- routing ----------------------------------------------------------------------
+
+/** Escape hatch for binary responses (backup export). */
+class RawResponse {
+  readonly bytes: Uint8Array;
+  readonly contentType: string;
+  readonly filename: string;
+
+  constructor(bytes: Uint8Array, contentType: string, filename: string) {
+    this.bytes = bytes;
+    this.contentType = contentType;
+    this.filename = filename;
+  }
+}
 
 type Handler = (
   ctx: Ctx,
@@ -333,6 +351,42 @@ function defineRoutes(): void {
       ? openKitabuFile(options.dbPath)
       : openKitabuInMemory();
     if (options.seedDemo === true) seedDemoData(ctx.kitabu);
+    return statePayload(ctx);
+  });
+
+  // -- backups (FR-22 / NFR-09: local encrypted export + restore) --------------------
+
+  // Export the whole live database as one passphrase-encrypted archive.
+  // Owner-only (enforced in core); the browser saves the octet-stream as a file.
+  route('POST', '/api/backup/export', (ctx, _p, body) => {
+    const passphrase = str(body, 'passphrase') ?? '';
+    const bytes = ctx.kitabu.exportBackup(passphrase);
+    const today = new Date().toISOString().slice(0, 10);
+    return new RawResponse(bytes, 'application/octet-stream', `kitabu-backup-${today}.kitabu`);
+  });
+
+  // Restore an archive onto this device. The passphrase is verified and the
+  // snapshot fully validated BEFORE the current database is replaced — a wrong
+  // passphrase never destroys existing data (NFR-09).
+  route('POST', '/api/backup/restore', (ctx, _p, body) => {
+    const passphrase = str(body, 'passphrase') ?? '';
+    const backupBase64 = str(body, 'backupBase64') ?? '';
+    let bytes: Uint8Array;
+    try {
+      bytes = base64ToBytes(backupBase64);
+    } catch {
+      throw new KitabuError('VALIDATION', 'That file could not be read as a Kitabu backup.');
+    }
+    const crypto = new NodeCryptoPort();
+    const snapshot = readBackup(bytes, passphrase, crypto); // throws friendly errors
+
+    // Only now, with the backup fully verified, swap the local database.
+    ctx.kitabu.close(); // also releases the file handle before rmSync (Windows)
+    if (ctx.options.dbPath !== undefined) rmSync(ctx.options.dbPath, { force: true });
+    const sqlite = ctx.options.dbPath !== undefined
+      ? openNodeSqlite(ctx.options.dbPath)
+      : openNodeSqlite(':memory:');
+    ctx.kitabu = Kitabu.openFromSnapshot({ sqlite, crypto, snapshot });
     return statePayload(ctx);
   });
 
@@ -646,6 +700,16 @@ export function createApiServer(options: ApiOptions = {}): ApiServer {
         applyActingUser(ctx, req);
         const body = req.method === 'POST' || req.method === 'PUT' ? await readJsonBody(req) : {};
         const result = await matched.handler(ctx, matched.params, body, url);
+        if (result instanceof RawResponse) {
+          res.writeHead(200, {
+            'content-type': result.contentType,
+            'content-length': String(result.bytes.length),
+            'content-disposition': `attachment; filename="${result.filename}"`,
+            'cache-control': 'no-store',
+          });
+          res.end(Buffer.from(result.bytes));
+          return;
+        }
         json(res, 200, result ?? { ok: true });
         return;
       }

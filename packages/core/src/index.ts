@@ -16,11 +16,14 @@ export type { Clock } from './foundation/clock.ts';
 export { Hlc, HybridLogicalClock } from './foundation/hlc.ts';
 export { Money, formatKsh } from './foundation/money.ts';
 export { normalizeKenyanMobile, isValidKenyanMobile, formatKenyanMobile } from './foundation/phone.ts';
-export { sha256, sha256Hex, sha256HexOfUtf8, utf8Bytes } from './foundation/sha256.ts';
+export { sha256, sha256Hex, sha256HexOfUtf8, utf8Bytes, utf8Text } from './foundation/sha256.ts';
 export { canonicalJson } from './foundation/canonicaljson.ts';
 export { bytesToBase64, base64ToBytes } from './foundation/base64.ts';
 export { shillingsInWords } from './foundation/numwords.ts';
-export type { CryptoPort, Ed25519KeyPair } from './foundation/crypto.ts';
+export type { CryptoPort, Ed25519KeyPair, AeadResult } from './foundation/crypto.ts';
+export { blake2b } from './foundation/blake2b.ts';
+export { argon2id } from './foundation/argon2.ts';
+export type { Argon2Input } from './foundation/argon2.ts';
 
 // db (ports + schema, no adapter)
 export type { SqlitePort, SqliteStatement, SqliteValue } from './db/port.ts';
@@ -64,3 +67,7 @@ export type { AuditEntry } from './services/mutations.ts';
 // facade
 export { Kitabu } from './kitabu.ts';
 export type { KitabuOptions, KitabuServices } from './kitabu.ts';
+
+// backup (FR-22 / NFR-09: local encrypted export + restore)
+export { buildSnapshot, applySnapshot, createBackup, readBackup, SNAPSHOT_TABLE_ORDER, BACKUP_KDF_DEFAULTS, BACKUP_FORMAT_VERSION, MIN_PASSPHRASE_LENGTH } from './services/backup.ts';
+export type { SnapshotPayload, SnapshotTable, BackupKdfParams, CreateBackupOptions } from './services/backup.ts';

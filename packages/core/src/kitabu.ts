@@ -9,7 +9,7 @@
 import type { SqlitePort } from './db/port.ts';
 import { getRow } from './db/port.ts';
 import { migrate } from './db/schema.ts';
-import { setting } from './db/crud.ts';
+import { setting, setSetting } from './db/crud.ts';
 import type { Clock } from './foundation/clock.ts';
 import { SystemClock } from './foundation/clock.ts';
 import type { CryptoPort } from './foundation/crypto.ts';
@@ -17,6 +17,7 @@ import { HybridLogicalClock } from './foundation/hlc.ts';
 import { KitabuError } from './foundation/errors.ts';
 import type { DeviceRow, OrganizationRow } from './domain/types.ts';
 import type { ServiceContext } from './services/context.ts';
+import { requireRole } from './services/context.ts';
 import { bootstrapOrganization } from './services/organization.ts';
 import type { BootstrapInput, BootstrapResult } from './services/organization.ts';
 import { OrganizationService } from './services/organization.ts';
@@ -27,6 +28,8 @@ import { AuditService } from './services/audit.ts';
 import { LedgerService } from './services/ledger.ts';
 import { PaymentService } from './services/payment.ts';
 import { ReceiptService } from './services/receipt.ts';
+import { createBackup, applySnapshot } from './services/backup.ts';
+import type { BackupKdfParams, SnapshotPayload } from './services/backup.ts';
 
 export interface KitabuOptions {
   /** An open, pragma-configured SQLite connection (`:memory:` or file). */
@@ -36,7 +39,6 @@ export interface KitabuOptions {
   /** Injectable Ed25519 signing (receipt tamper-evidence). Node impl in ./node.ts. */
   crypto?: CryptoPort;
 }
-
 export interface KitabuServices {
   organization: OrganizationService;
   property: PropertyService;
@@ -115,6 +117,40 @@ export class Kitabu {
     this.#ctx = result.ctx;
     this.#services = this.#buildServices(result.ctx);
     return result;
+  }
+
+  /**
+   * Restore a snapshot onto a fresh database and open it (device replacement,
+   * SYNC.md §6). The database must not already hold an organization.
+   */
+  static openFromSnapshot(options: KitabuOptions & { snapshot: SnapshotPayload }): Kitabu {
+    applySnapshot(options.sqlite, options.snapshot);
+    return Kitabu.open(options);
+  }
+
+  /**
+   * Export the whole live database as one passphrase-encrypted backup archive
+   * (FR-22, SECURITY.md §4). Owner-only. Records the export time for the
+   * Settings screen ("last backup").
+   */
+  exportBackup(passphrase: string, params?: Partial<BackupKdfParams>): Uint8Array {
+    this.#requireBootstrapped();
+    requireRole(this.#ctx!, ['OWNER'], 'export an encrypted backup');
+    if (this.#crypto === undefined) {
+      throw new KitabuError('VALIDATION', 'Backups are not available in this build of Kitabu (no crypto provider).');
+    }
+    const bytes = createBackup(this.#db, passphrase, {
+      crypto: this.#crypto,
+      params,
+      nowIso: this.#clock.nowIso(),
+    });
+    setSetting(this.#db, 'backup.last_exported_at', this.#clock.nowIso());
+    return bytes;
+  }
+
+  /** Read a local-only setting (app_settings; e.g. backup.last_exported_at). */
+  localSetting(key: string): string | null {
+    return setting(this.#db, key);
   }
 
   get isBootstrapped(): boolean {

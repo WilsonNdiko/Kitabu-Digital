@@ -96,6 +96,33 @@ export function utf8Bytes(text: string): Uint8Array {
   return new TextEncoder().encode(text);
 }
 
+/**
+ * UTF-8 decode without TextDecoder (Hermes lacks it): UTF-8 → JS string.
+ * ~1 line of standard algorithm; backup snapshots are the only caller.
+ */
+export function utf8Text(bytes: Uint8Array): string {
+  let out = '';
+  for (let i = 0; i < bytes.length; ) {
+    const b0 = bytes[i]!;
+    if (b0 < 0x80) {
+      out += String.fromCharCode(b0);
+      i += 1;
+    } else if (b0 < 0xe0) {
+      out += String.fromCharCode(((b0 & 0x1f) << 6) | (bytes[i + 1]! & 0x3f));
+      i += 2;
+    } else if (b0 < 0xf0) {
+      out += String.fromCharCode(((b0 & 0x0f) << 12) | ((bytes[i + 1]! & 0x3f) << 6) | (bytes[i + 2]! & 0x3f));
+      i += 3;
+    } else {
+      const cp = ((b0 & 0x07) << 18) | ((bytes[i + 1]! & 0x3f) << 12) | ((bytes[i + 2]! & 0x3f) << 6) | (bytes[i + 3]! & 0x3f);
+      const minus = cp - 0x10000;
+      out += String.fromCharCode(0xd800 + (minus >> 10), 0xdc00 + (minus & 0x3ff));
+      i += 4;
+    }
+  }
+  return out;
+}
+
 export function sha256HexOfUtf8(text: string): string {
   return sha256Hex(utf8Bytes(text));
 }
