@@ -39,7 +39,7 @@ receipt signing, **114/114 tests green** (all FINANCIAL-LEDGER §5 worked exampl
 as executable fixtures). The PDF template lands with the app shells (M3) — the
 signed, frozen snapshot it renders is already in place.
 
-## M3 — App shells (Phase 1 finish)
+## M3 — App shells (Phase 1 finish) — 🚧 in progress
 
 - Electron Windows app (installer, auto-update scaffold, SQLCipher, DPAPI key seal,
   PIN unlock, LAN sync-host capability stub).
@@ -47,6 +47,15 @@ signed, frozen snapshot it renders is already in place.
 - Screens: onboarding, unlock, dashboard, properties, tenants, record payment
   (≤5 taps), payments, receipts (PDF), settings; offline chip; friendly errors.
 - Local encrypted backup export/restore (Argon2id passphrase).
+**Progress:** the screens exist and run — `apps/web` (React shell: onboarding,
+dashboard, properties, tenants + statements, ≤5-tap record-payment, M-Pesa
+verification queue, printable signed receipts, settings/team) on `apps/local-api`
+(zero-dep local server hosting the real core; the Electron-main stand-in).
+Role matrix from SECURITY.md §3 now enforced in the core services and locked by
+`packages/core/test/roles.test.ts`. **125/125 tests green.**
+Remaining: Electron + React Native wrappers, PIN unlock, encrypted backup,
+receipt PDF template.
+
 **Exit:** "Green View" single-device walkthrough on Windows + Android fully offline;
 NFR-02/03/04/12 measured.
 

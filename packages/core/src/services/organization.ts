@@ -230,6 +230,7 @@ export class OrganizationService {
     phone?: string | null;
     unitTerm?: string;
   }): OrganizationRow {
+    requireRole(this.ctx, ['OWNER'], 'change organization settings');
     return this.ctx.db.transaction(() => {
       const org = this.get();
       const before = { ...org };

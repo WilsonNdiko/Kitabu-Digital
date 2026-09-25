@@ -8,6 +8,7 @@
  */
 
 import type { ServiceContext } from './context.ts';
+import { requireRole } from './context.ts';
 import { appendAudit, recordOp, stampNew, stampUpdate } from './mutations.ts';
 import { insertRow, updateRow } from '../db/crud.ts';
 import type { BuildingRow, PropertyRow, UnitKind, UnitRow, UnitStatus } from '../domain/types.ts';
@@ -124,6 +125,7 @@ export class PropertyService {
     estate?: string;
     notes?: string;
   }): PropertyRow {
+    requireRole(this.ctx, ['OWNER'], 'add a property');
     const name = input.name.trim();
     if (name === '') throw validationError('Give the property a name (for example "Green View Apartments").');
 
@@ -155,6 +157,7 @@ export class PropertyService {
     estate?: string | null;
     notes?: string | null;
   }): PropertyRow {
+    requireRole(this.ctx, ['OWNER'], 'edit a property');
     return this.ctx.db.transaction(() => {
       const row = this.getProperty(id);
       const before = { ...row };
@@ -184,6 +187,7 @@ export class PropertyService {
 
   /** Soft-delete a property — only when no unit has an active tenancy. */
   archiveProperty(id: string): PropertyRow {
+    requireRole(this.ctx, ['OWNER'], 'archive a property');
     return this.ctx.db.transaction(() => {
       const row = this.getProperty(id);
       const active = this.ctx.db
@@ -233,6 +237,7 @@ export class PropertyService {
   }
 
   addBuilding(input: { propertyId: string; name: string; notes?: string }): BuildingRow {
+    requireRole(this.ctx, ['OWNER'], 'add a building');
     const name = input.name.trim();
     if (name === '') throw validationError('Give the building a name (for example "Block A").');
     return this.ctx.db.transaction(() => {
@@ -264,6 +269,7 @@ export class PropertyService {
     kind?: UnitKind;
     notes?: string;
   }): UnitRow {
+    requireRole(this.ctx, ['OWNER'], 'add a house');
     const label = input.label.trim();
     if (label === '') throw validationError('Give the house a number or name (for example "A-12").');
     const kind: UnitKind = input.kind ?? 'HOUSE';
@@ -316,6 +322,7 @@ export class PropertyService {
     kind?: UnitKind;
     notes?: string | null;
   }): UnitRow {
+    requireRole(this.ctx, ['OWNER'], 'edit a house');
     return this.ctx.db.transaction(() => {
       const row = this.#getUnitInternal(id);
       const before = { ...row };
@@ -351,6 +358,7 @@ export class PropertyService {
 
   /** Flag/unflag a VACANT unit as under maintenance. Occupied units must be vacated first. */
   setUnitMaintenance(id: string, on: boolean): UnitRow {
+    requireRole(this.ctx, ['OWNER'], 'mark a house as under maintenance');
     return this.ctx.db.transaction(() => {
       const row = this.#getUnitInternal(id);
       if (on && row.status === 'OCCUPIED') {

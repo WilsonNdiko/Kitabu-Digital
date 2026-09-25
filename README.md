@@ -13,8 +13,9 @@ and multi-device sync that **never** requires internet for core operation.
 |---|---|---|
 | M0 | Architecture & design package | ✅ complete (`docs/`) |
 | M1 | Core foundation — local DB, ids/HLC/money, org/property/tenant/tenancy services, audit + op-log | ✅ complete |
-| M2 | Financial core (ledger, payments, arrears, receipts) | ✅ complete — **114/114 tests green** |
-| M3+ | App shells, operations, local sync, cloud, M-Pesa, AI | see [docs/ROADMAP.md](docs/ROADMAP.md) |
+| M2 | Financial core (ledger, payments, arrears, receipts) | ✅ complete |
+| M3 | App shells — web UI + local API done; Electron/RN next | 🚧 in progress — **125/125 tests green** |
+| M4+ | Operations, local sync, cloud, M-Pesa, AI | see [docs/ROADMAP.md](docs/ROADMAP.md) |
 
 ## Architecture in one paragraph
 
@@ -37,8 +38,9 @@ packages/core/      @kitabu/core — shared core (pure TypeScript, zero deps)
   src/foundation/   … + sha256/base64/canonical JSON · amounts-in-words (Kiswahili-ready)
   src/services/     Organization · Property · Tenant · Tenancy · Audit · op-log recorder
                     · Ledger · Payment · Receipt (Ed25519-signed, immutable)
-  test/             17 suites, 114 tests (node:test, zero-dependency)
-apps/               Application shells (M3: React Native + Electron)
+  test/             18 core suites + local-api suite — 125 tests (node:test, zero-dep)
+apps/web/           Web shell — the screens (React; becomes the Electron renderer)
+apps/local-api/     Local API — zero-dep node:http server hosting the core (app backend)
 server/             Cloud API (M6: NestJS + PostgreSQL)
 ```
 
@@ -47,10 +49,15 @@ server/             Cloud API (M6: NestJS + PostgreSQL)
 Requires Node.js ≥ 22.18 (no other dependencies — the core is dependency-free):
 
 ```bash
-npm install        # dev tooling only (typescript, @types/node)
-npm test           # run the core test suites
-npm run typecheck  # strict TypeScript check
+npm install        # dev tooling only (typescript, vite, react)
+npm test           # run all test suites (core + local API)
+npm run typecheck  # strict TypeScript check (core, API, web)
+npm run dev        # run the app: local API + web shell (open http://localhost:5173)
+npm run demo       # single-process build: the API serves the compiled app on :8787
 ```
+
+The dev/demo database is seeded with a believable Green View portfolio (a
+pending M-Pesa code, arrears, an advance tenant) — `apps/README.md` has details.
 
 Try the core interactively (charge rent, record an M-Pesa payment, issue a receipt):
 

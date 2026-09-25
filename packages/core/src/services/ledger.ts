@@ -249,6 +249,7 @@ export class LedgerService {
    * Proration is deliberately not modelled (Kenyan practice: full month).
    */
   generateMonthlyCharges(month: string, input: { propertyId?: string } = {}): ChargeGenerationResult {
+    requireRole(this.ctx, ['OWNER'], 'generate monthly rent charges');
     if (!MONTH_RE.test(month)) throw validationError('Use a month like 2026-09.');
 
     return this.ctx.db.transaction(() => {

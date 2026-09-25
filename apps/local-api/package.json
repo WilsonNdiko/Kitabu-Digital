@@ -1,0 +1,13 @@
+{
+  "name": "@kitabu/local-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kitabu local API — hosts @kitabu/core over HTTP for the app shells (Electron main-process stand-in for the web shell).",
+  "type": "module",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/main.ts"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

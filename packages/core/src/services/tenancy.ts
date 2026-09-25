@@ -8,6 +8,7 @@
  */
 
 import type { ServiceContext } from './context.ts';
+import { requireRole } from './context.ts';
 import { appendAudit, recordOp, stampNew, stampUpdate } from './mutations.ts';
 import { insertRow, updateRow } from '../db/crud.ts';
 import type { RentRateRow, TenancyRow, TenantRow, UnitRow } from '../domain/types.ts';
@@ -102,6 +103,7 @@ export class TenancyService {
   // -- writes ------------------------------------------------------------------
 
   startTenancy(input: StartTenancyInput): TenancyRow {
+    requireRole(this.ctx, ['OWNER'], 'move a tenant into a house');
     return this.ctx.db.transaction(() => this.#startTenancyTx(input));
   }
 
@@ -184,6 +186,7 @@ export class TenancyService {
   }
 
   endTenancy(tenancyId: string, endDate: string, reason?: string): TenancyRow {
+    requireRole(this.ctx, ['OWNER'], 'end a tenancy');
     return this.ctx.db.transaction(() => this.#endTenancyTx(tenancyId, endDate, reason ?? 'Tenancy ended'));
   }
 
@@ -236,6 +239,7 @@ export class TenancyService {
     newDepositMinor?: number;
     reason?: string;
   }): { ended: TenancyRow; started: TenancyRow } {
+    requireRole(this.ctx, ['OWNER'], 'move a tenant to another house');
     if (!isValidIsoDate(opts.date)) throw validationError('The move date is not a valid date.');
 
     return this.ctx.db.transaction(() => {
@@ -274,6 +278,7 @@ export class TenancyService {
    * in effect (FINANCIAL-LEDGER.md §3).
    */
   changeRent(tenancyId: string, newRentMinor: number, effectiveFrom: string, reason?: string): RentRateRow {
+    requireRole(this.ctx, ['OWNER'], 'change the rent');
     if (!isValidIsoDate(effectiveFrom)) throw validationError('The effective date is not a valid date.');
     if (!Number.isSafeInteger(newRentMinor) || newRentMinor <= 0) {
       throw validationError('Enter the new rent as a positive amount.');

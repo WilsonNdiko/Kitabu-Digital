@@ -5,6 +5,7 @@
  */
 
 import type { ServiceContext } from './context.ts';
+import { requireRole } from './context.ts';
 import { appendAudit, recordOp, stampNew, stampUpdate } from './mutations.ts';
 import { insertRow, updateRow } from '../db/crud.ts';
 import type { SqliteValue } from '../db/port.ts';
@@ -143,6 +144,7 @@ export class TenantService {
     emergencyContact?: string | null;
     notes?: string | null;
   }): TenantRow {
+    requireRole(this.ctx, ['OWNER', 'MANAGER'], 'edit tenant details');
     return this.ctx.db.transaction(() => {
       const row = this.getTenant(id);
       const before = { ...row };
@@ -179,6 +181,7 @@ export class TenantService {
    * history stays intact and the tenant disappears from day-to-day lists.
    */
   archiveTenant(id: string, reason?: string): TenantRow {
+    requireRole(this.ctx, ['OWNER', 'MANAGER'], 'archive a tenant');
     return this.ctx.db.transaction(() => {
       const row = this.getTenant(id);
       if (row.deleted_at !== null) return row;

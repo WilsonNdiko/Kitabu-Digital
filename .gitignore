@@ -8,3 +8,5 @@ coverage/
 .env
 .env.*
 !.env.example
+apps/local-api/data/
+data/
