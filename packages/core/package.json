@@ -1,0 +1,14 @@
+{
+  "name": "@kitabu/core",
+  "version": "0.1.0",
+  "description": "Kitabu shared core — domain, local database, services, sync kernel. Zero runtime dependencies.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node.ts"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

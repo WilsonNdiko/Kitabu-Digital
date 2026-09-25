@@ -1,0 +1,22 @@
+{
+  "name": "kitabu-digital",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kitabu — offline-first property management for Kenyan landlords (monorepo)",
+  "type": "module",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "node --disable-warning=ExperimentalWarning --test \"packages/core/test/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}
