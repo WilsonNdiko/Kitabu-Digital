@@ -21,6 +21,13 @@ export const SYNCED_TABLES = [
   'tenancies',
   'rent_rates',
   'audit_log',
+  'payments',
+  'ledger_entries',
+  'payment_allocations',
+  'receipts',
+  'signature_images',
+  'receipt_number_blocks',
+  'org_keys',
 ] as const;
 
 export type TableName = (typeof SYNCED_TABLES)[number];

@@ -12,6 +12,7 @@ import { migrate } from './db/schema.ts';
 import { setting } from './db/crud.ts';
 import type { Clock } from './foundation/clock.ts';
 import { SystemClock } from './foundation/clock.ts';
+import type { CryptoPort } from './foundation/crypto.ts';
 import { HybridLogicalClock } from './foundation/hlc.ts';
 import { KitabuError } from './foundation/errors.ts';
 import type { DeviceRow, OrganizationRow } from './domain/types.ts';
@@ -23,12 +24,17 @@ import { PropertyService } from './services/property.ts';
 import { TenantService } from './services/tenant.ts';
 import { TenancyService } from './services/tenancy.ts';
 import { AuditService } from './services/audit.ts';
+import { LedgerService } from './services/ledger.ts';
+import { PaymentService } from './services/payment.ts';
+import { ReceiptService } from './services/receipt.ts';
 
 export interface KitabuOptions {
   /** An open, pragma-configured SQLite connection (`:memory:` or file). */
   sqlite: SqlitePort;
   /** Injectable clock (tests pass ManualClock; apps use SystemClock). */
   clock?: Clock;
+  /** Injectable Ed25519 signing (receipt tamper-evidence). Node impl in ./node.ts. */
+  crypto?: CryptoPort;
 }
 
 export interface KitabuServices {
@@ -37,24 +43,29 @@ export interface KitabuServices {
   tenant: TenantService;
   tenancy: TenancyService;
   audit: AuditService;
+  ledger: LedgerService;
+  payment: PaymentService;
+  receipt: ReceiptService;
 }
 
 export class Kitabu {
   readonly #db: SqlitePort;
   readonly #clock: Clock;
+  readonly #crypto: CryptoPort | undefined;
   #ctx: ServiceContext | null = null;
   #services: KitabuServices | null = null;
 
-  private constructor(db: SqlitePort, clock: Clock) {
+  private constructor(db: SqlitePort, clock: Clock, crypto?: CryptoPort) {
     this.#db = db;
     this.#clock = clock;
+    this.#crypto = crypto;
   }
 
   /** Open + migrate the local database; loads organization state if present. */
   static open(options: KitabuOptions): Kitabu {
     const clock = options.clock ?? new SystemClock();
     migrate(options.sqlite);
-    const kitabu = new Kitabu(options.sqlite, clock);
+    const kitabu = new Kitabu(options.sqlite, clock, options.crypto);
     kitabu.#loadExisting();
     return kitabu;
   }
@@ -89,6 +100,9 @@ export class Kitabu {
       tenant: new TenantService(ctx),
       tenancy: new TenancyService(ctx),
       audit: new AuditService(ctx),
+      ledger: new LedgerService(ctx),
+      payment: new PaymentService(ctx),
+      receipt: new ReceiptService(ctx, this.#crypto),
     };
   }
 

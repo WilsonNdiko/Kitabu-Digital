@@ -16,7 +16,7 @@ import type { SqlitePort } from './port.ts';
 import { getRow } from './port.ts';
 import { KitabuError } from '../foundation/errors.ts';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const SCHEMA_V1: readonly string[] = [
   // -- organizations ---------------------------------------------------------
@@ -248,6 +248,226 @@ const SCHEMA_V1: readonly string[] = [
   )`,
 ];
 
+// ---------------------------------------------------------------------------
+// Schema v2 — financial core (Milestone 2). Tables + DB-level immutability
+// triggers (docs/DATABASE.md §4, FINANCIAL-LEDGER.md §7):
+//   - ledger_entries: no UPDATE, no DELETE — append-only journal
+//   - payments: legal state transitions only; amount/ref/date/method frozen
+//     once VERIFIED or REVERSED
+//   - payment_allocations: insert-only; sum per payment can never exceed the
+//     payment amount (trigger)
+//   - receipts: core fields frozen; only void columns + sync metadata change
+// ---------------------------------------------------------------------------
+
+const SCHEMA_V2: readonly string[] = [
+  `CREATE TABLE payments (
+    id TEXT PRIMARY KEY,
+    org_id TEXT NOT NULL,
+    tenancy_id TEXT NOT NULL REFERENCES tenancies(id),
+    property_id TEXT NOT NULL,
+    unit_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+    method TEXT NOT NULL CHECK (method IN ('CASH','MPESA','BANK','OTHER')),
+    paid_at TEXT NOT NULL,
+    reference TEXT,
+    payer_name TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','VERIFYING','VERIFIED','REJECTED','REVERSED')),
+    verified_at TEXT,
+    verified_by_user_id TEXT,
+    verification_note TEXT,
+    reversal_reason TEXT,
+    recorded_by_user_id TEXT,
+    recorded_by_device_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    version INTEGER NOT NULL,
+    hlc TEXT NOT NULL,
+    origin_device_id TEXT NOT NULL
+  )`,
+  `CREATE INDEX idx_payments_status ON payments(org_id, status)`,
+  `CREATE INDEX idx_payments_tenancy ON payments(org_id, tenancy_id, paid_at)`,
+  `CREATE INDEX idx_payments_property_month ON payments(org_id, property_id, paid_at)`,
+  `CREATE UNIQUE INDEX idx_payments_ref ON payments(org_id, method, reference)
+     WHERE reference IS NOT NULL`,
+
+  `CREATE TABLE signature_images (
+    id TEXT PRIMARY KEY,
+    org_id TEXT NOT NULL,
+    property_id TEXT REFERENCES properties(id),
+    label TEXT NOT NULL DEFAULT 'Signature',
+    image_ref TEXT NOT NULL,
+    image_digest TEXT NOT NULL,
+    active_from TEXT NOT NULL,
+    active_to TEXT,
+    created_by_user_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    version INTEGER NOT NULL,
+    hlc TEXT NOT NULL,
+    origin_device_id TEXT NOT NULL
+  )`,
+  `CREATE INDEX idx_signature_active ON signature_images(org_id, property_id, active_to)`,
+
+  `CREATE TABLE ledger_entries (
+    id TEXT PRIMARY KEY,
+    org_id TEXT NOT NULL,
+    tenancy_id TEXT NOT NULL REFERENCES tenancies(id),
+    property_id TEXT NOT NULL,
+    unit_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    entry_date TEXT NOT NULL,
+    entry_type TEXT NOT NULL CHECK (entry_type IN ('CHARGE','PAYMENT_CREDIT','ADJUSTMENT','REVERSAL')),
+    direction TEXT NOT NULL CHECK (direction IN ('DEBIT','CREDIT')),
+    amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+    kind TEXT NOT NULL DEFAULT 'OTHER' CHECK (kind IN ('RENT','WATER','GARBAGE','LATE_FEE','PENALTY','DISCOUNT','OTHER')),
+    period TEXT,
+    payment_id TEXT REFERENCES payments(id),
+    reversal_of TEXT REFERENCES ledger_entries(id),
+    reason TEXT,
+    note TEXT,
+    source TEXT NOT NULL DEFAULT 'MANUAL' CHECK (source IN ('AUTO_GENERATED','MANUAL','SYNC','MIGRATION')),
+    posted_by_user_id TEXT,
+    posted_by_device_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    version INTEGER NOT NULL,
+    hlc TEXT NOT NULL,
+    origin_device_id TEXT NOT NULL
+  )`,
+  `CREATE INDEX idx_ledger_tenancy ON ledger_entries(org_id, tenancy_id, entry_date)`,
+  `CREATE INDEX idx_ledger_period ON ledger_entries(org_id, period, kind)`,
+  `CREATE INDEX idx_ledger_payment ON ledger_entries(payment_id)`,
+  `CREATE UNIQUE INDEX idx_ledger_rent_period ON ledger_entries(tenancy_id, period, kind)
+     WHERE entry_type = 'CHARGE' AND source = 'AUTO_GENERATED' AND deleted_at IS NULL`,
+
+  `CREATE TABLE payment_allocations (
+    id TEXT PRIMARY KEY,
+    org_id TEXT NOT NULL,
+    payment_id TEXT NOT NULL REFERENCES payments(id),
+    charge_id TEXT NOT NULL REFERENCES ledger_entries(id),
+    amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    version INTEGER NOT NULL,
+    hlc TEXT NOT NULL,
+    origin_device_id TEXT NOT NULL
+  )`,
+  `CREATE INDEX idx_allocations_payment ON payment_allocations(payment_id)`,
+  `CREATE INDEX idx_allocations_charge ON payment_allocations(charge_id)`,
+  `CREATE UNIQUE INDEX idx_allocations_pair ON payment_allocations(payment_id, charge_id)`,
+
+  `CREATE TABLE receipt_number_blocks (
+    id TEXT PRIMARY KEY,
+    org_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    block_start INTEGER NOT NULL,
+    block_end INTEGER NOT NULL,
+    next_value INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    version INTEGER NOT NULL,
+    hlc TEXT NOT NULL,
+    origin_device_id TEXT NOT NULL,
+    CHECK (block_start >= 1 AND block_end >= block_start AND next_value BETWEEN block_start AND block_end + 1)
+  )`,
+  `CREATE INDEX idx_blocks_device ON receipt_number_blocks(org_id, device_id)`,
+
+  `CREATE TABLE org_keys (
+    id TEXT PRIMARY KEY,
+    org_id TEXT NOT NULL,
+    purpose TEXT NOT NULL,
+    public_key TEXT NOT NULL,
+    private_key TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    version INTEGER NOT NULL,
+    hlc TEXT NOT NULL,
+    origin_device_id TEXT NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX idx_org_keys_purpose ON org_keys(org_id, purpose)`,
+
+  `CREATE TABLE receipts (
+    id TEXT PRIMARY KEY,
+    org_id TEXT NOT NULL,
+    receipt_no TEXT NOT NULL,
+    payment_id TEXT NOT NULL REFERENCES payments(id),
+    tenancy_id TEXT NOT NULL,
+    property_id TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    digest TEXT NOT NULL,
+    signature_image_id TEXT REFERENCES signature_images(id),
+    signature_digest TEXT,
+    crypto_signature TEXT,
+    issued_by_user_id TEXT,
+    issued_by_device_id TEXT NOT NULL,
+    voided_at TEXT,
+    void_reason TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    version INTEGER NOT NULL,
+    hlc TEXT NOT NULL,
+    origin_device_id TEXT NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX idx_receipts_no ON receipts(org_id, receipt_no)`,
+  `CREATE INDEX idx_receipts_payment ON receipts(payment_id)`,
+
+  // -- immutability triggers ---------------------------------------------------
+  `CREATE TRIGGER trg_ledger_entries_no_update BEFORE UPDATE ON ledger_entries
+   BEGIN SELECT RAISE(ABORT, 'LEDGER_IMMUTABLE'); END`,
+  `CREATE TRIGGER trg_ledger_entries_no_delete BEFORE DELETE ON ledger_entries
+   BEGIN SELECT RAISE(ABORT, 'LEDGER_IMMUTABLE'); END`,
+
+  `CREATE TRIGGER trg_payments_status_transition BEFORE UPDATE ON payments
+   WHEN NEW.status != OLD.status AND NOT (
+     (OLD.status = 'PENDING'   AND NEW.status IN ('VERIFYING','VERIFIED','REJECTED')) OR
+     (OLD.status = 'VERIFYING' AND NEW.status IN ('PENDING','VERIFIED','REJECTED')) OR
+     (OLD.status = 'VERIFIED'  AND NEW.status = 'REVERSED')
+   )
+   BEGIN SELECT RAISE(ABORT, 'PAYMENT_ILLEGAL_TRANSITION'); END`,
+  `CREATE TRIGGER trg_payments_immutable BEFORE UPDATE ON payments
+   WHEN OLD.status IN ('VERIFIED','REVERSED') AND (
+     NEW.amount_minor != OLD.amount_minor OR NEW.method != OLD.method OR
+     NEW.paid_at != OLD.paid_at OR NEW.reference IS NOT OLD.reference OR
+     NEW.tenancy_id != OLD.tenancy_id OR NEW.tenant_id != OLD.tenant_id
+   )
+   BEGIN SELECT RAISE(ABORT, 'PAYMENT_IMMUTABLE'); END`,
+
+  `CREATE TRIGGER trg_payment_allocations_no_update BEFORE UPDATE ON payment_allocations
+   BEGIN SELECT RAISE(ABORT, 'ALLOCATION_IMMUTABLE'); END`,
+  `CREATE TRIGGER trg_payment_allocations_no_delete BEFORE DELETE ON payment_allocations
+   BEGIN SELECT RAISE(ABORT, 'ALLOCATION_IMMUTABLE'); END`,
+  `CREATE TRIGGER trg_allocations_within_payment BEFORE INSERT ON payment_allocations
+   BEGIN
+     SELECT RAISE(ABORT, 'ALLOCATION_EXCEEDS_PAYMENT') WHERE
+       (SELECT COALESCE(SUM(a.amount_minor), 0) FROM payment_allocations a
+          WHERE a.payment_id = NEW.payment_id AND a.id != NEW.id) + NEW.amount_minor
+       > (SELECT p.amount_minor FROM payments p WHERE p.id = NEW.payment_id);
+   END`,
+
+  `CREATE TRIGGER trg_receipts_immutable BEFORE UPDATE ON receipts
+   WHEN NEW.receipt_no != OLD.receipt_no OR NEW.payment_id != OLD.payment_id OR
+        NEW.snapshot_json != OLD.snapshot_json OR NEW.digest != OLD.digest OR
+        NEW.crypto_signature IS NOT OLD.crypto_signature OR
+        NEW.signature_image_id IS NOT OLD.signature_image_id OR
+        NEW.signature_digest IS NOT OLD.signature_digest
+   BEGIN SELECT RAISE(ABORT, 'RECEIPT_IMMUTABLE'); END`,
+  `CREATE TRIGGER trg_receipts_no_delete BEFORE DELETE ON receipts
+   BEGIN SELECT RAISE(ABORT, 'RECEIPT_IMMUTABLE'); END`,
+];
+
+export const MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: readonly string[] }> = [
+  { toVersion: 1, statements: SCHEMA_V1 },
+  { toVersion: 2, statements: SCHEMA_V2 },
+];
+
 export function migrate(db: SqlitePort): void {
   const row = getRow<{ user_version: number }>(db, 'PRAGMA user_version');
   const current = row?.user_version ?? 0;
@@ -261,8 +481,11 @@ export function migrate(db: SqlitePort): void {
   }
   if (current === SCHEMA_VERSION) return;
 
-  db.transaction(() => {
-    for (const stmt of SCHEMA_V1) db.exec(stmt);
-    db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
-  });
+  for (const migration of MIGRATIONS) {
+    if (migration.toVersion <= current) continue;
+    db.transaction(() => {
+      for (const stmt of migration.statements) db.exec(stmt);
+      db.exec(`PRAGMA user_version = ${migration.toVersion}`);
+    });
+  }
 }

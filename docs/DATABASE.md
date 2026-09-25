@@ -228,7 +228,7 @@ CREATE INDEX idx_changelog_row ON change_log(table_name, row_id);
 CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 ```
 
-## 4. Schema v2 — financial core (designed now, shipped in Milestone 2)
+## 4. Schema v2 — financial core (implemented in Milestone 2)
 
 ### ledger_entries — append-only financial journal
 ```sql
@@ -335,20 +335,37 @@ CREATE TABLE receipt_number_blocks (      -- local allocation of per-org sequenc
 );
 ```
 
-### Immutability triggers (M2) — database-level enforcement
+### org_keys — device org signing keys (one row per purpose)
 ```sql
--- Example: verified payments can never be edited; only the state-machine columns may change.
-CREATE TRIGGER trg_payments_no_edit_after_verified
-BEFORE UPDATE ON payments
-WHEN OLD.status IN ('VERIFIED','REVERSED')
-     AND (NEW.amount_minor != OLD.amount_minor OR NEW.reference IS NOT OLD.reference
-          OR NEW.paid_at != OLD.paid_at OR NEW.method != OLD.method)
-BEGIN
-  SELECT RAISE(ABORT, 'PAYMENT_IMMUTABLE');
-END;
--- Similar guards on ledger_entries (no UPDATE/DELETE at all) and receipts
--- (only voided_at/void_reason/version/sync columns may change).
+CREATE TABLE org_keys (
+  id TEXT PRIMARY KEY, org_id TEXT NOT NULL,
+  purpose TEXT NOT NULL,                    -- 'RECEIPTS' (Ed25519 receipt signing)
+  public_key TEXT NOT NULL,                 -- SPKI, base64
+  private_key TEXT NOT NULL,                -- PKCS8, base64 (device-local secret)
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT,
+  version INTEGER NOT NULL, hlc TEXT NOT NULL, origin_device_id TEXT NOT NULL
+);
+CREATE UNIQUE INDEX idx_org_keys_purpose ON org_keys(org_id, purpose);
 ```
+One row per org per purpose — a second insert is rejected, so the org's receipt
+identity can never silently fork. The row syncs with the org so paired devices can
+verify and reissue receipts; inside the local database it is protected by the
+SQLCipher container (app shells, M3), with OS-keystore wrapping as the hardening
+step called for by SECURITY.md/RECEIPTS.md.
+
+### Immutability & integrity triggers (M2) — database-level enforcement
+Nine triggers in `schema.ts` (v2) guard the books; the same rules apply to the
+Postgres cloud copy in M6:
+
+| Trigger | Table | Enforces |
+| --- | --- | --- |
+| `trg_ledger_entries_no_update` / `_no_delete` | `ledger_entries` | The journal is append-only — no row can ever change or disappear. |
+| `trg_payments_status_transition` | `payments` | State machine: PENDING→VERIFYING/VERIFIED/REJECTED, VERIFYING→VERIFIED/REJECTED/PENDING, VERIFIED→REVERSED. REJECTED and REVERSED are terminal. |
+| `trg_payments_immutable` | `payments` | Once VERIFIED/REVERSED, amount, method, `paid_at`, reference, tenancy and tenant are frozen. |
+| `trg_payment_allocations_no_update` / `_no_delete` | `payment_allocations` | Waterfall history is append-only — allocations can never be rewritten to move money after the fact. |
+| `trg_allocations_within_payment` | `payment_allocations` | `SUM(allocations) ≤ payment.amount` — a payment can never allocate more than it was for. |
+| `trg_receipts_immutable` | `receipts` | Number, snapshot, digest and signatures are frozen; only `voided_at`/`void_reason`/sync columns may change. |
+| `trg_receipts_no_delete` | `receipts` | Receipts are never deleted — corrections void and reissue. |
 
 ## 5. Schema v3 — operations (Milestone 4)
 

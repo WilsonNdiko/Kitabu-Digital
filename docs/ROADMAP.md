@@ -23,7 +23,7 @@ sync, security, AI, M-Pesa, receipts, UX, deployment, risks.
 **Exit criteria:** `npm test` green; every mutation writes data+audit+op-log
 atomically; tenancy history provably preserved on moves; rent changes append-only.
 
-## M2 — Financial core (Phase 2) — the most-tested milestone
+## M2 — Financial core (Phase 2) — the most-tested milestone ✅ **complete**
 
 - Ledger entries (charges/payments/adjustments/reversals), monthly charge generation
   (idempotent, effective-dated rates), payment state machine + immutability triggers,
@@ -32,8 +32,12 @@ atomically; tenancy history provably preserved on moves; rent changes append-onl
   void+reissue. Signature images.
 - Tests: every FINANCIAL-LEDGER.md §5 worked example as a fixture; invariant suite
   (FINANCIAL-LEDGER.md §7); trigger-tamper attempts.
-**Exit:** red-line tests pass incl. reversal, duplicate ref, rent change history;
-receipts immutable at DB level.
+**Exit:** ✅ red-line tests pass incl. reversal, duplicate ref, rent change history;
+receipts immutable at DB level. Delivered: schema v2 (7 tables, 9 integrity
+triggers, v1→v2 in-place migration), ledger/payment/receipt services, Ed25519
+receipt signing, **114/114 tests green** (all FINANCIAL-LEDGER §5 worked examples
+as executable fixtures). The PDF template lands with the app shells (M3) — the
+signed, frozen snapshot it renders is already in place.
 
 ## M3 — App shells (Phase 1 finish)
 

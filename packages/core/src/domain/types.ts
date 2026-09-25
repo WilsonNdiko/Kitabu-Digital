@@ -137,3 +137,101 @@ export interface ChangeLogRow {
   origin_device_id: string;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Financial core (schema v2, docs/DATABASE.md §4)
+// ---------------------------------------------------------------------------
+
+export type PaymentMethod = 'CASH' | 'MPESA' | 'BANK' | 'OTHER';
+export type PaymentStatus = 'PENDING' | 'VERIFYING' | 'VERIFIED' | 'REJECTED' | 'REVERSED';
+export type LedgerEntryType = 'CHARGE' | 'PAYMENT_CREDIT' | 'ADJUSTMENT' | 'REVERSAL';
+export type LedgerDirection = 'DEBIT' | 'CREDIT';
+export type LedgerKind = 'RENT' | 'WATER' | 'GARBAGE' | 'LATE_FEE' | 'PENALTY' | 'DISCOUNT' | 'OTHER';
+export type LedgerSource = 'AUTO_GENERATED' | 'MANUAL' | 'SYNC' | 'MIGRATION';
+
+export const PAYMENT_METHODS: readonly PaymentMethod[] = ['CASH', 'MPESA', 'BANK', 'OTHER'];
+export const LEDGER_KINDS: readonly LedgerKind[] = ['RENT', 'WATER', 'GARBAGE', 'LATE_FEE', 'PENALTY', 'DISCOUNT', 'OTHER'];
+
+export interface PaymentRow extends SyncColumns {
+  tenancy_id: string;
+  property_id: string;
+  unit_id: string;
+  tenant_id: string;
+  amount_minor: number;
+  method: PaymentMethod;
+  paid_at: string;
+  reference: string | null;
+  payer_name: string | null;
+  status: PaymentStatus;
+  verified_at: string | null;
+  verified_by_user_id: string | null;
+  verification_note: string | null;
+  reversal_reason: string | null;
+  recorded_by_user_id: string | null;
+  recorded_by_device_id: string;
+}
+
+export interface LedgerEntryRow extends SyncColumns {
+  tenancy_id: string;
+  property_id: string;
+  unit_id: string;
+  tenant_id: string;
+  entry_date: string;
+  entry_type: LedgerEntryType;
+  direction: LedgerDirection;
+  amount_minor: number;
+  kind: LedgerKind;
+  period: string | null;
+  payment_id: string | null;
+  reversal_of: string | null;
+  reason: string | null;
+  note: string | null;
+  source: LedgerSource;
+  posted_by_user_id: string | null;
+  posted_by_device_id: string;
+}
+
+export interface PaymentAllocationRow extends SyncColumns {
+  payment_id: string;
+  charge_id: string;
+  amount_minor: number;
+}
+
+export interface ReceiptRow extends SyncColumns {
+  receipt_no: string;
+  payment_id: string;
+  tenancy_id: string;
+  property_id: string;
+  snapshot_json: string;
+  digest: string;
+  signature_image_id: string | null;
+  signature_digest: string | null;
+  crypto_signature: string | null;
+  issued_by_user_id: string | null;
+  issued_by_device_id: string;
+  voided_at: string | null;
+  void_reason: string | null;
+}
+
+export interface SignatureImageRow extends SyncColumns {
+  property_id: string | null;
+  label: string;
+  image_ref: string;
+  image_digest: string;
+  active_from: string;
+  active_to: string | null;
+  created_by_user_id: string | null;
+}
+
+export interface ReceiptNumberBlockRow extends SyncColumns {
+  device_id: string;
+  block_start: number;
+  block_end: number;
+  next_value: number;
+}
+
+export interface OrgKeyRow extends SyncColumns {
+  purpose: string;
+  public_key: string;
+  private_key: string;
+}

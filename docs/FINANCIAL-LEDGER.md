@@ -107,8 +107,9 @@ Manual re-allocation (rare) = reverse allocations + re-allocate, audited.
 ## 5. Worked examples (test fixtures in M2)
 
 **Partial payment with carried arrears.** Rent 12,000/month, tenant pays 8,000 in Sep:
-Aug charge 12,000 (D) + Sep charge 12,000 (D) + payment 8,000 (C) → balance 16,000;
-Sep month status = PARTIAL; arrears aging shows 4,000 (Aug) + 12,000 (Sep).
+Aug charge 12,000 (D) + Sep charge 12,000 (D) + payment 8,000 (C) → balance 16,000.
+The waterfall settles the oldest month first, so Aug = PARTIAL (4,000 still owing)
+and Sep = UNPAID (12,000); arrears aging shows 4,000 (Aug) + 12,000 (Sep).
 
 **Advance rent.** New tenant pays 24,000 on move-in (rent 12,000, deposit tracked
 separately): Sep charge 12,000 (D) + Oct charge 12,000 (D) + payment 24,000 (C)

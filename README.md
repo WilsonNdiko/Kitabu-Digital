@@ -12,8 +12,8 @@ and multi-device sync that **never** requires internet for core operation.
 | Milestone | Scope | Status |
 |---|---|---|
 | M0 | Architecture & design package | ✅ complete (`docs/`) |
-| M1 | Core foundation — local DB, ids/HLC/money, org/property/tenant/tenancy services, audit + op-log | ✅ complete — **66/66 tests green** |
-| M2 | Financial core (ledger, payments, arrears, receipts) | next |
+| M1 | Core foundation — local DB, ids/HLC/money, org/property/tenant/tenancy services, audit + op-log | ✅ complete |
+| M2 | Financial core (ledger, payments, arrears, receipts) | ✅ complete — **114/114 tests green** |
 | M3+ | App shells, operations, local sync, cloud, M-Pesa, AI | see [docs/ROADMAP.md](docs/ROADMAP.md) |
 
 ## Architecture in one paragraph
@@ -32,10 +32,12 @@ operation log exchanged over local Wi-Fi (QR pairing) and, optionally, the cloud
 docs/               Design package (PRD, architecture, database, sync, security, …)
 packages/core/      @kitabu/core — shared core (pure TypeScript, zero deps)
   src/foundation/   UUIDv7/ULID ids · hybrid logical clocks · Money (KSh) · phones · errors
-  src/db/           SqlitePort · schema v1 + migrations · Node adapter (node:sqlite)
+  src/db/           SqlitePort · schema v1+v2 + migrations · Node adapter (node:sqlite)
   src/domain/       Row types & enums (schema mirror)
+  src/foundation/   … + sha256/base64/canonical JSON · amounts-in-words (Kiswahili-ready)
   src/services/     Organization · Property · Tenant · Tenancy · Audit · op-log recorder
-  test/             66 assertions-rich suites (node:test, zero-dependency)
+                    · Ledger · Payment · Receipt (Ed25519-signed, immutable)
+  test/             17 suites, 114 tests (node:test, zero-dependency)
 apps/               Application shells (M3: React Native + Electron)
 server/             Cloud API (M6: NestJS + PostgreSQL)
 ```
@@ -50,7 +52,7 @@ npm test           # run the core test suites
 npm run typecheck  # strict TypeScript check
 ```
 
-Try the core interactively (record a tenancy, check history):
+Try the core interactively (charge rent, record an M-Pesa payment, issue a receipt):
 
 ```bash
 node --disable-warning=ExperimentalWarning -e "
@@ -61,8 +63,12 @@ import('./packages/core/src/node.ts').then(({ openKitabuInMemory }) => {
   const u = k.services.property.addUnit({ propertyId: p.id, label: 'A-12' });
   const t = k.services.tenant.registerTenant({ fullName: 'John Kamau', phone: '0712345678' });
   const tn = k.services.tenancy.startTenancy({ tenantId: t.id, unitId: u.id, rentMinor: 1200000, startDate: '2026-09-01' });
-  k.services.tenancy.changeRent(tn.id, 1350000, '2026-10-01', 'Renewal');
-  console.log('History:', k.services.tenancy.tenancyHistory(t.id));
+  k.services.ledger.generateMonthlyCharges('2026-09');
+  const pay = k.services.payment.recordPayment({ tenancyId: tn.id, amountMinor: 1200000, method: 'MPESA', paidAt: '2026-09-04', reference: 'QGH7XJ2M9L' });
+  k.services.payment.verifyPayment(pay.id, 'Code matched the M-Pesa message');
+  const rec = k.services.receipt.issueReceipt(pay.id);
+  console.log('Receipt', rec.receipt.receipt_no, '—', rec.snapshot.amountWords);
+  console.log('Balance:', k.services.ledger.tenancyBalance(tn.id));
   console.log('Audit:', k.services.audit.list({ limit: 3 }).map(a => a.summary));
   k.close();
 });"

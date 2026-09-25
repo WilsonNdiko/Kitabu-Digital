@@ -157,6 +157,13 @@ removes most conflict classes by construction.
 - **New device** (post-pairing or post-restore): snapshot restore → watermark set to
   snapshot hlc → normal incremental sync.
 
+**Synced tables (schema v2, 17):** organizations, devices, users, properties,
+buildings, units, tenants, tenancies, rent_rates, audit_log (M1) · payments,
+ledger_entries, payment_allocations, receipts, signature_images,
+receipt_number_blocks, org_keys (M2).
+**Local-only (never replicated):** change_log (the op stream itself), app_settings.
+Immutable financial rows sync as INSERT-only ops — there is no UPDATE path to conflict.
+
 ## 7. Topology & duplicate prevention (the brief's §32/§33 test)
 
 ```

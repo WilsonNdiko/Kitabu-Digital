@@ -7,13 +7,14 @@
  */
 
 import type { ServiceContext } from './context.ts';
+import { requireRole } from './context.ts';
 import { appendAudit, recordOp, stampNew, stampUpdate } from './mutations.ts';
 import { insertRow, setSetting, updateRow } from '../db/crud.ts';
 import type { DevicePlatform, DeviceRow, OrganizationRow, UserRow } from '../domain/types.ts';
 import type { Clock } from '../foundation/clock.ts';
 import { HybridLogicalClock } from '../foundation/hlc.ts';
 import { uuidv7 } from '../foundation/ids.ts';
-import { domainRule, validationError } from '../foundation/errors.ts';
+import { domainRule, notFound, validationError } from '../foundation/errors.ts';
 import { normalizeKenyanMobile } from '../foundation/phone.ts';
 import type { SqlitePort } from '../db/port.ts';
 
@@ -172,6 +173,54 @@ export class OrganizationService {
       .get(this.ctx.orgId) as OrganizationRow | undefined;
     if (row === undefined) throw domainRule('Organization not found.');
     return row;
+  }
+
+  listUsers(): UserRow[] {
+    return this.ctx.db
+      .prepare('SELECT * FROM users WHERE org_id = ? AND deleted_at IS NULL ORDER BY full_name COLLATE NOCASE')
+      .all(this.ctx.orgId) as UserRow[];
+  }
+
+  getUser(id: string): UserRow {
+    const row = this.ctx.db
+      .prepare('SELECT * FROM users WHERE id = ? AND org_id = ? AND deleted_at IS NULL')
+      .get(id, this.ctx.orgId) as UserRow | undefined;
+    if (row === undefined) throw notFound('User not found.');
+    return row;
+  }
+
+  /** Add a team member (Owner-only; SECURITY.md §3). */
+  addUser(input: { fullName: string; role: 'OWNER' | 'MANAGER' | 'CARETAKER'; phone?: string }): UserRow {
+    requireRole(this.ctx, ['OWNER'], 'add a manager or caretaker');
+    const fullName = input.fullName.trim().replace(/\s+/g, ' ');
+    if (fullName === '') throw validationError('The team member must have a name.');
+    let phone: string | null = null;
+    if (input.phone !== undefined && input.phone.trim() !== '') {
+      phone = normalizeKenyanMobile(input.phone);
+      if (phone === null) throw validationError('That phone number does not look right.');
+    }
+
+    return this.ctx.db.transaction(() => {
+      const stamp = stampNew(this.ctx);
+      const row: UserRow = {
+        ...stamp,
+        full_name: fullName,
+        phone,
+        email: null,
+        role: input.role,
+        is_active: 1,
+      };
+      insertRow(this.ctx.db, 'users', row);
+      recordOp(this.ctx, 'users', row);
+      appendAudit(this.ctx, {
+        action: 'USER_ADDED',
+        entityType: 'user',
+        entityId: row.id,
+        summary: `${fullName} added as ${input.role.charAt(0)}${input.role.slice(1).toLowerCase()}.`,
+        after: { ...row },
+      });
+      return row;
+    });
   }
 
   update(input: {

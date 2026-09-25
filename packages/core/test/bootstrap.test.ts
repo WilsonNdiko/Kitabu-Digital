@@ -117,7 +117,7 @@ test('reopen: file database reloads organization and keeps HLC monotonic across 
 test('schema: fresh database starts at user_version 1 with foreign keys on', () => {
   const { kitabu } = newKitabu();
   const version = getRow<{ user_version: number }>(kitabu.services.audit.ctx.db, 'PRAGMA user_version');
-  assert.equal(version?.user_version, 1);
+  assert.equal(version?.user_version, 2);
   const fk = getRow<{ foreign_keys: number }>(kitabu.services.audit.ctx.db, 'PRAGMA foreign_keys');
   assert.equal(fk?.foreign_keys, 1);
   kitabu.close();
