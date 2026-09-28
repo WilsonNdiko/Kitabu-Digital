@@ -26,6 +26,13 @@ export function openDb(path: string): DB {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA);
+  // additive migrations for databases created before these columns existed
+  for (const stmt of [
+    'ALTER TABLE sync_peers ADD COLUMN peer_name TEXT',
+    'ALTER TABLE sync_peers ADD COLUMN peer_address TEXT',
+  ]) {
+    try { db.exec(stmt); } catch { /* column already exists */ }
+  }
   return db;
 }
 

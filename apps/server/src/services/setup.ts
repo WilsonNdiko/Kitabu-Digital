@@ -46,7 +46,7 @@ export function runSetup(db: DB, input: SetupInput) {
       role: 'OWNER', pin_hash: input.pin ? hashPin(input.pin) : null, status: 'ACTIVE',
     });
     insertRow(ctx, 'devices', {
-      id: deviceId, org_id: orgId, name: 'This device', platform: process.platform,
+      id: deviceId, org_id: orgId, name: 'Main device', platform: process.platform,
       device_code: deviceCode, public_key: null, status: 'ACTIVE', paired_at: nowIso(), last_sync_at: null,
     });
     const propId = newId('prop');

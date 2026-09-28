@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:device2": "WEB_PORT=5174 KITABU_API=http://localhost:4001 vite",
     "build": "vite build"
   },
   "dependencies": {

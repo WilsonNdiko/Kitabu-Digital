@@ -23,10 +23,19 @@ Design docs in `docs/` (PRD, architecture + tech decision, database, sync, secur
 
 ## Phase 3 — Property Operations (partially in this repo)
 - M3.1 Expenses ✅ · M3.2 Maintenance workflow ✅ · M3.3 Global search ✅
-- M3.4 Documents/attachments ◻ · M3.5 Reports + CSV/PDF export ◻ · M3.6 Signature upload UI ◻
+- M3.5 Reports (collection / expenses / occupancy) + CSV export ✅
+- M3.4 Documents/attachments ◻ · M3.6 Signature image upload UI ◻ · PDF export ◻
 
-## Phase 4 — Local Device Sync ◻
-Device registration/QR pairing → mDNS discovery → encrypted transport → change-log exchange → conflict handling (per docs/SYNC.md) → sync UI. Test entirely without internet.
+## Phase 4 — Local Device Sync ✅ v1 (this repo)
+- M4.1 Change-log exchange engine: idempotent apply, dedup by change_id, relay-safe ✅
+- M4.2 Pairing: one-time code ceremony + full-history join (QR rendering of the same code: ◻) ✅
+- M4.3 Per-entity conflict policies: payment status priority + automatic ledger reconciliation,
+  deterministic receipt-race winner, deterministic double-move-in resolution, LWW for profiles ✅
+- M4.4 Peer HTTP endpoints with device auth (shared org key) + revocation enforcement ✅
+- M4.5 Sync UI: pairing, peers, Sync Now, join-from-onboarding, offline chip ✅
+- M4.6 §64 acceptance scenario automated (three days offline → converge, no dupes) ✅
+- Remaining: mDNS auto-discovery ◻ · Noise/mTLS transport encryption (currently shared-key auth on
+  trusted LAN) ◻ · per-staff user identities on paired devices ◻ · sync of documents/audit log ◻
 
 ## Phase 5 — Cloud ◻
 Optional accounts, multi-tenant cloud API (Fastify + Postgres RLS), local→cloud migration, multi-device sync, backup, device recovery.

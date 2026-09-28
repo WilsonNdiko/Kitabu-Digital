@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
+    "dev:device2": "KITABU_DB=data/kitabu-device2.db PORT=4001 tsx src/index.ts",
     "test": "vitest run"
   },
   "dependencies": {

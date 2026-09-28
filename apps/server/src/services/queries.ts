@@ -224,11 +224,16 @@ export function search(ctx: Ctx, q: string) {
 export function syncStatus(ctx: Ctx) {
   const pending = ctx.db.prepare('SELECT COUNT(*) c FROM change_log WHERE synced_to_cloud = 0').get() as any;
   const device = ctx.db.prepare('SELECT name, device_code FROM devices WHERE id = ?').get(ctx.deviceId) as any;
+  const peers = ctx.db.prepare(
+    `SELECT sp.device_id, sp.last_sync_at, sp.peer_address,
+            COALESCE(d.name, sp.peer_name, 'Paired device') name, COALESCE(d.status,'ACTIVE') status
+       FROM sync_peers sp LEFT JOIN devices d ON d.id = sp.device_id`,
+  ).all() as any[];
   return {
     pendingChanges: pending.c,
     device: { id: ctx.deviceId, code: ctx.deviceCode, name: device?.name ?? 'This device' },
     cloud: { connected: false, lastSyncAt: null },
-    peers: [],
+    peers,
   };
 }
 

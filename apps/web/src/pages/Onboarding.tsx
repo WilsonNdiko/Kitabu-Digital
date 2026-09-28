@@ -34,6 +34,18 @@ export default function Onboarding({ onDone }: { onDone: () => Promise<void> }) 
     catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
 
+  // -- joining an existing Kitabu (caretaker / second device) --
+  const [joinAddress, setJoinAddress] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [joinName, setJoinName] = useState('');
+  const join = async () => {
+    setErr(''); setBusy(true);
+    try {
+      await api.post('/sync/pair-with', { address: joinAddress, code: joinCode, deviceName: joinName || 'New device' });
+      await onDone();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  };
+
   return (
     <div style={{ maxWidth: 520, margin: '0 auto', padding: '48px 20px' }}>
       <div style={{ textAlign: 'center', marginBottom: 28 }}>
@@ -56,6 +68,34 @@ export default function Onboarding({ onDone }: { onDone: () => Promise<void> }) 
           </div>
           <button className="btn" disabled={!ownerName.trim() || busy} onClick={() => setStep(1)}>Continue →</button>
           <button className="btn ghost" disabled={busy} onClick={demo}>Or explore with sample data (Green View Apartments)</button>
+          <button className="btn ghost" disabled={busy} onClick={() => setStep(2)}>Or join your landlord's Kitabu (pair this device)</button>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="card form" style={{ maxWidth: 'none' }}>
+          <p className="sub" style={{ margin: 0 }}>
+            On the main device open <strong>Sync &amp; Devices → Add Device</strong>. Make sure both devices are on
+            the same Wi-Fi or hotspot, then enter the code and address shown there.
+          </p>
+          <div className="field">
+            <label>Main device address</label>
+            <input value={joinAddress} onChange={(e) => setJoinAddress(e.target.value)} placeholder="e.g. 192.168.0.12:4000" autoFocus />
+          </div>
+          <div className="field">
+            <label>Pairing code</label>
+            <input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="e.g. 9F3A1C" style={{ letterSpacing: 4, fontWeight: 700 }} />
+          </div>
+          <div className="field">
+            <label>Name for this device</label>
+            <input value={joinName} onChange={(e) => setJoinName(e.target.value)} placeholder="e.g. Jane's phone" />
+          </div>
+          <div className="row">
+            <button className="btn secondary" onClick={() => setStep(0)}>← Back</button>
+            <button className="btn" disabled={busy || !joinAddress.trim() || !joinCode.trim()} onClick={join}>
+              {busy ? 'Pairing…' : 'Pair & download my Kitabu'}
+            </button>
+          </div>
         </div>
       )}
 

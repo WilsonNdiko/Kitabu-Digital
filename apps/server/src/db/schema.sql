@@ -277,5 +277,7 @@ CREATE TABLE IF NOT EXISTS applied_changes (
 CREATE TABLE IF NOT EXISTS sync_peers (
   device_id TEXT PRIMARY KEY,
   last_seq_received INTEGER NOT NULL DEFAULT 0,
-  last_sync_at TEXT
+  last_sync_at TEXT,
+  peer_name TEXT,
+  peer_address TEXT
 );

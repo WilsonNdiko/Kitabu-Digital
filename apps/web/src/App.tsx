@@ -16,6 +16,7 @@ import ReceiptView from './pages/ReceiptView';
 import Expenses from './pages/Expenses';
 import Maintenance from './pages/Maintenance';
 import Arrears from './pages/Arrears';
+import Reports from './pages/Reports';
 import SyncPage from './pages/SyncPage';
 
 export interface Bootstrap {
@@ -51,6 +52,7 @@ export default function App() {
     { to: '/receipts', label: 'Receipts', ico: '🧾' },
     { to: '/expenses', label: 'Expenses', ico: '🧰' },
     { to: '/maintenance', label: 'Maintenance', ico: '🔧' },
+    { to: '/reports', label: 'Reports', ico: '📊' },
     { to: '/sync', label: 'Sync & Devices', ico: '🔄' },
   ];
 
@@ -95,6 +97,7 @@ export default function App() {
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/arrears" element={<Arrears />} />
+            <Route path="/reports" element={<Reports />} />
             <Route path="/sync" element={<SyncPage />} />
           </Routes>
         </main>

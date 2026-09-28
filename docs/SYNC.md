@@ -78,6 +78,18 @@ Conflict = incoming change for a row whose local `version`/HLC has diverged from
 - **Local → Cloud migration** (offline user later creates an account): device registers org in cloud → uploads its full change history as one resumable session → cloud applies with the same dedup rules. Re-running migration is a no-op (idempotent). No duplicates by construction.
 - **Device recovery:** new device signs in → owner authorizes it → downloads snapshot + change tail → becomes a normal replica.
 
+## 6b. Implementation status (v1, this repo)
+
+`apps/server/src/sync/` implements: change-log exchange with per-peer cursors, idempotent apply
+with `applied_changes` dedup, relay-safe foreign-change recording (original change_id kept),
+single-use pairing codes + full-history join, pull-then-push sessions initiable from either side,
+device revocation enforcement, and the per-entity policies of §5 — including automatic ledger
+reconciliation (a payment that ends REJECTED/REVERSED after a merge gets its deterministic
+REVERSAL entry on every device, so money never diverges). Deviations from target design, tracked
+in docs/ROADMAP.md: discovery is manual address entry (mDNS later); transport auth is a shared
+org key over the trusted LAN (Noise/mTLS later); HLC exists in the log but LWW currently compares
+version/updated_at with a device-id tie-break.
+
 ## 7. Sync UX
 
 - Persistent status chip: `● Offline` / `↻ N changes waiting` / `✓ Synced`. **Saved locally ≠ synced** — the UI copy makes the distinction explicit.
