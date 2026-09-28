@@ -11,7 +11,7 @@ Design docs in `docs/` (PRD, architecture + tech decision, database, sync, secur
 - M1.3 Onboarding: organization, first property, bulk unit creation ✅
 - M1.4 Tenants + tenancies (move-in, history preserved) ✅
 - M1.5 Web UI shell: Home, Properties, Tenants, offline-first ✅
-- M1.6 Local user profile + PIN (hash stored; full lock-screen wiring: Phase 4 hardening) ◻
+- M1.6 Staff users (Owner/Manager/Caretaker) + PIN lock screen + role-gated routes ✅
 
 ## Phase 2 — Financial Core ✅ (this repo)
 - M2.1 Ledger engine (charges/payments/adjustments/reversals) + heavy tests ✅
@@ -24,7 +24,8 @@ Design docs in `docs/` (PRD, architecture + tech decision, database, sync, secur
 ## Phase 3 — Property Operations (partially in this repo)
 - M3.1 Expenses ✅ · M3.2 Maintenance workflow ✅ · M3.3 Global search ✅
 - M3.5 Reports (collection / expenses / occupancy) + CSV export ✅
-- M3.4 Documents/attachments ◻ · M3.6 Signature image upload UI ◻ · PDF export ◻
+- M3.6 Digital signature on receipts (upload, frozen into receipt snapshot at issuance, synced) ✅
+- M3.4 Documents/attachments ◻ · PDF export (print-to-PDF works; native export ◻)
 
 ## Phase 4 — Local Device Sync ✅ v1 (this repo)
 - M4.1 Change-log exchange engine: idempotent apply, dedup by change_id, relay-safe ✅
@@ -34,8 +35,12 @@ Design docs in `docs/` (PRD, architecture + tech decision, database, sync, secur
 - M4.4 Peer HTTP endpoints with device auth (shared org key) + revocation enforcement ✅
 - M4.5 Sync UI: pairing, peers, Sync Now, join-from-onboarding, offline chip ✅
 - M4.6 §64 acceptance scenario automated (three days offline → converge, no dupes) ✅
+- M4.7 Per-staff identities on any device: lock screen asks "who is using this device?" after
+  pairing/restore; staff sync to all devices and sign in with their own PIN + role ✅
+- M4.8 Encrypted local backup (AES-256-GCM, scrypt passphrase) + restore-as-local-join on a fresh
+  device (replays history through the sync engine — receipt numbers survive, later sync is safe) ✅
 - Remaining: mDNS auto-discovery ◻ · Noise/mTLS transport encryption (currently shared-key auth on
-  trusted LAN) ◻ · per-staff user identities on paired devices ◻ · sync of documents/audit log ◻
+  trusted LAN) ◻ · sync of documents/audit log (audit stays device-local by design for now) ◻
 
 ## Phase 5 — Cloud ◻
 Optional accounts, multi-tenant cloud API (Fastify + Postgres RLS), local→cloud migration, multi-device sync, backup, device recovery.

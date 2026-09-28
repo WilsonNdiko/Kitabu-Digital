@@ -45,7 +45,9 @@ export default function ReceiptView() {
 
         <div className="sig">
           <div>
-            <div className="line">{s.issuedBy}</div>
+            {s.signature?.dataUrl
+              ? <img src={s.signature.dataUrl} alt="Signature" style={{ maxHeight: 52, maxWidth: 180, display: 'block', marginBottom: 2 }} />
+              : <div className="line">{s.issuedBy}</div>}
             <div className="cap">Authorized signature</div>
           </div>
           <div className="cap" style={{ textAlign: 'right' }}>

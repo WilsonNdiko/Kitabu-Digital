@@ -13,6 +13,17 @@ async function req(path: string, opts?: RequestInit): Promise<any> {
 export const api = {
   get: (path: string) => req(path),
   post: (path: string, data?: unknown) => req(path, { method: 'POST', body: JSON.stringify(data ?? {}) }),
+  /** POST that downloads a file (e.g. the encrypted backup). */
+  postBlob: async (path: string, data?: unknown): Promise<Blob> => {
+    const res = await fetch(`/api${path}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data ?? {}),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({} as any));
+      throw new Error((body as any).error || 'Something went wrong. Please try again.');
+    }
+    return res.blob();
+  },
 };
 
 // ---- money helpers (display only; the server owns all arithmetic) ----

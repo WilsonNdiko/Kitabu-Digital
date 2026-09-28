@@ -9,6 +9,7 @@ Protect against: lost/stolen devices, snooping caretakers exceeding their role, 
 - **App PIN** (per user profile on the device) gates the app; PINs stored as salted hashes (scrypt). PIN ≠ cloud password.
 - Data at rest: Android file-based encryption + optional SQLCipher; Windows DPAPI-protected key + optional SQLCipher. Signature images and documents stored under app-private storage; signature files referenced by sha256 so tampering is detectable.
 - **Local backups are always encrypted** (age/AES-GCM with a passphrase the landlord sets); a lost unencrypted backup file must not expose tenant data.
+  - *Implemented:* `KITABU01` file format = magic ‖ scrypt salt(16) ‖ GCM iv(12) ‖ auth tag(16) ‖ AES-256-GCM ciphertext of the whole SQLite file. Restore only works on a fresh install and replays history through the sync engine (restore = local join), so the restored machine becomes a new device with its own receipt book and later syncs cannot duplicate records. The audit log is device-local and is not carried across restores (by design, v1).
 
 ## 3. Roles & permissions (RBAC)
 

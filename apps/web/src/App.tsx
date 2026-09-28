@@ -18,9 +18,15 @@ import Maintenance from './pages/Maintenance';
 import Arrears from './pages/Arrears';
 import Reports from './pages/Reports';
 import SyncPage from './pages/SyncPage';
+import Staff from './pages/Staff';
+import SettingsPage from './pages/SettingsPage';
+import BackupPage from './pages/BackupPage';
+import { LockScreen } from './components/LockScreen';
 
 export interface Bootstrap {
   initialized: boolean;
+  locked?: boolean;
+  users?: any[];
   org?: { id: string; name: string; terminology: string };
   user?: { id: string; full_name: string; role: string };
   sync?: { pendingChanges: number };
@@ -34,12 +40,16 @@ export default function App() {
   const refresh = () => api.get('/bootstrap').then((b) => { setBoot(b); setPending(b.sync?.pendingChanges ?? 0); });
   useEffect(() => { refresh().catch(() => setBoot({ initialized: false })); }, []);
   useEffect(() => {
-    if (!boot?.initialized) return;
+    if (!boot?.initialized || boot.locked) return;
     api.get('/sync/status').then((s) => setPending(s.pendingChanges)).catch(() => {});
-  }, [loc.pathname, boot?.initialized]);
+  }, [loc.pathname, boot?.initialized, boot?.locked]);
 
   if (boot === null) return null;
   if (!boot.initialized) return <Onboarding onDone={refresh} />;
+  if (boot.locked) return <LockScreen users={boot.users ?? []} onUnlocked={refresh} />;
+
+  const lock = () => api.post('/auth/lock').then(refresh);
+  const role = boot.user?.role;
 
   const nav = [
     { to: '/', label: 'Home', ico: '🏠' },
@@ -52,8 +62,13 @@ export default function App() {
     { to: '/receipts', label: 'Receipts', ico: '🧾' },
     { to: '/expenses', label: 'Expenses', ico: '🧰' },
     { to: '/maintenance', label: 'Maintenance', ico: '🔧' },
-    { to: '/reports', label: 'Reports', ico: '📊' },
+    ...(role !== 'CARETAKER' ? [{ to: '/reports', label: 'Reports', ico: '📊' }] : []),
     { to: '/sync', label: 'Sync & Devices', ico: '🔄' },
+    ...(role === 'OWNER' ? [
+      { to: '/staff', label: 'Staff', ico: '🧑‍🤝‍🧑' },
+      { to: '/backup', label: 'Backup', ico: '💾' },
+    ] : []),
+    { to: '/settings', label: 'Settings', ico: '⚙️' },
   ];
 
   return (
@@ -71,6 +86,8 @@ export default function App() {
             <span>{n.ico}</span> {n.label}
           </NavLink>
         ))}
+        <div className="nav-section">{boot.user?.full_name}</div>
+        <a className="nav-item" style={{ cursor: 'pointer' }} onClick={lock}><span>🔒</span> Lock</a>
       </aside>
 
       <div className="main">
@@ -99,6 +116,9 @@ export default function App() {
             <Route path="/arrears" element={<Arrears />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/sync" element={<SyncPage />} />
+            <Route path="/staff" element={<Staff meRole={role} />} />
+            <Route path="/settings" element={<SettingsPage meRole={role} />} />
+            <Route path="/backup" element={<BackupPage meRole={role} />} />
           </Routes>
         </main>
 

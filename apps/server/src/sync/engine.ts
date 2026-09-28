@@ -13,7 +13,7 @@ import { AppError, nowIso, type Ctx, type DB } from '../db/index.js';
 export const SYNCED_TABLES = [
   'organizations', 'users', 'properties', 'units', 'tenants', 'tenancies',
   'rent_rates', 'ledger_entries', 'payments', 'receipts', 'expenses',
-  'maintenance_requests', 'devices',
+  'maintenance_requests', 'devices', 'signatures',
 ] as const;
 const SYNCED = new Set<string>(SYNCED_TABLES);
 

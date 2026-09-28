@@ -10,6 +10,7 @@ export default function Onboarding({ onDone }: { onDone: () => Promise<void> }) 
   const [count, setCount] = useState('10');
   const [prefix, setPrefix] = useState('A-');
   const [rent, setRent] = useState('');
+  const [pin, setPin] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -22,6 +23,7 @@ export default function Onboarding({ onDone }: { onDone: () => Promise<void> }) 
       const rentMinor = toMinor(rent);
       await api.post('/setup', {
         ownerName, orgName: orgName || `${ownerName.split(' ')[0]} Properties`, propertyName, location,
+        pin: pin || undefined,
         units: Array.from({ length: n }, (_, i) => ({ label: `${prefix}${i + 1}`, rentMinor })),
       });
       await onDone();
@@ -42,6 +44,22 @@ export default function Onboarding({ onDone }: { onDone: () => Promise<void> }) 
     setErr(''); setBusy(true);
     try {
       await api.post('/sync/pair-with', { address: joinAddress, code: joinCode, deviceName: joinName || 'New device' });
+      await onDone();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  };
+
+  // -- restoring from an encrypted backup file --
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restorePass, setRestorePass] = useState('');
+  const restore = async () => {
+    setErr(''); setBusy(true);
+    try {
+      if (!restoreFile) throw new Error('Choose your backup file (.kdb).');
+      const buf = new Uint8Array(await restoreFile.arrayBuffer());
+      let bin = '';
+      const CHUNK = 0x8000;
+      for (let i = 0; i < buf.length; i += CHUNK) bin += String.fromCharCode(...buf.subarray(i, i + CHUNK));
+      await api.post('/restore', { passphrase: restorePass, dataBase64: btoa(bin) });
       await onDone();
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
@@ -69,6 +87,30 @@ export default function Onboarding({ onDone }: { onDone: () => Promise<void> }) 
           <button className="btn" disabled={!ownerName.trim() || busy} onClick={() => setStep(1)}>Continue →</button>
           <button className="btn ghost" disabled={busy} onClick={demo}>Or explore with sample data (Green View Apartments)</button>
           <button className="btn ghost" disabled={busy} onClick={() => setStep(2)}>Or join your landlord's Kitabu (pair this device)</button>
+          <button className="btn ghost" disabled={busy} onClick={() => setStep(3)}>Or restore from a backup file</button>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="card form" style={{ maxWidth: 'none' }}>
+          <p className="sub" style={{ margin: 0 }}>
+            Pick the encrypted backup file (<strong>.kdb</strong>) you downloaded from Kitabu, and enter the
+            passphrase you chose when creating it. Everything comes back — tenants, payments and receipts.
+          </p>
+          <div className="field">
+            <label>Backup file</label>
+            <input type="file" accept=".kdb,application/octet-stream" onChange={(e) => setRestoreFile(e.target.files?.[0] ?? null)} />
+          </div>
+          <div className="field">
+            <label>Backup passphrase</label>
+            <input type="password" value={restorePass} onChange={(e) => setRestorePass(e.target.value)} />
+          </div>
+          <div className="row">
+            <button className="btn secondary" onClick={() => setStep(0)}>← Back</button>
+            <button className="btn" disabled={busy || !restoreFile || !restorePass} onClick={restore}>
+              {busy ? 'Restoring…' : 'Restore my Kitabu'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -123,6 +165,11 @@ export default function Onboarding({ onDone }: { onDone: () => Promise<void> }) 
             <label>Monthly rent (KSh)</label>
             <input value={rent} onChange={(e) => setRent(e.target.value)} placeholder="e.g. 8500" inputMode="numeric" />
             <div className="hint">Houses will be named {prefix}1 … {prefix}{count || 'N'}. You can rename each and set different rents later.</div>
+          </div>
+          <div className="field">
+            <label>PIN to lock the app <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional, 4–8 digits)</span></label>
+            <input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} placeholder="e.g. 1234" />
+            <div className="hint">Anyone opening Kitabu on this device will need this PIN. You can add staff with their own PINs later.</div>
           </div>
           <div className="row">
             <button className="btn secondary" onClick={() => setStep(0)}>← Back</button>

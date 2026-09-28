@@ -106,6 +106,7 @@ export function applyJoinBundle(db: DB, bundle: JoinBundle, landlordAddress: str
   const res = applyChanges(ctx, bundle.changes);
   const last = bundle.changes.length ? bundle.changes[bundle.changes.length - 1]!.seq : 0;
   advancePeerCursor(db, bundle.landlordDeviceId, last, 'Main device', landlordAddress);
+  setSetting(db, 'locked', '1'); // first open asks "who is using this device?"
   return { ...res, orgName: bundle.orgName };
 }
 

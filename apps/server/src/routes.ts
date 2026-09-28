@@ -16,6 +16,9 @@ import {
   localAddresses, performSync, receivePush,
 } from './sync/service.js';
 import { audit, getSetting, nowIso, updateRow } from './db/index.js';
+import { createUser, deactivateUser, isLocked, listUsers, lockDevice, lockScreenUsers, loginUser, setUserPin } from './services/users.js';
+import { setSignature, signatureStatus } from './services/signatures.js';
+import { backupStatus, createBackup, restoreBackup } from './services/backup.js';
 
 export function buildRouter(db: DB): Router {
   const r = Router();
@@ -26,17 +29,54 @@ export function buildRouter(db: DB): Router {
       try {
         const ctx = getCtx(db);
         if (!ctx) throw new AppError('Kitabu is not set up on this device yet.', 409);
+        if (isLocked(db)) throw new AppError('Kitabu is locked. Unlock it first.', 401);
         Promise.resolve(fn(ctx, req, res)).catch(next);
       } catch (e) { next(e); }
     };
+
+  /** Caretakers never see org-wide financial reports or the audit trail (§8, §51). */
+  const requireFinancialRole = (ctx: { userRole: string }) => {
+    if (ctx.userRole === 'CARETAKER') {
+      throw new AppError('Reports are only available to the owner and managers.', 403);
+    }
+  };
 
   // ---- bootstrap & onboarding ----
   r.get('/bootstrap', (req, res) => {
     const ctx = getCtx(db);
     if (!ctx) return res.json({ initialized: false });
+    if (isLocked(db)) return res.json({ initialized: true, locked: true, users: lockScreenUsers(db) });
     const org = db.prepare('SELECT id, name, terminology FROM organizations WHERE id = ?').get(ctx.orgId);
     const user = db.prepare('SELECT id, full_name, role FROM users WHERE id = ?').get(ctx.userId);
-    res.json({ initialized: true, org, user, sync: syncStatus(ctx) });
+    res.json({ initialized: true, locked: false, org, user, sync: syncStatus(ctx) });
+  });
+
+  // ---- lock / login / staff ----
+  r.post('/auth/login', (req, res) => res.json(loginUser(db, req.body)));
+  r.post('/auth/lock', (_req, res) => { lockDevice(db); res.json({ ok: true }); });
+  r.get('/users', withCtx((ctx, _q, res) => res.json(listUsers(ctx))));
+  r.post('/users', withCtx((ctx, req, res) => res.json(createUser(ctx, req.body))));
+  r.post('/users/:id/pin', withCtx((ctx, req, res) => { setUserPin(ctx, req.params.id!, req.body.pin); res.json({ ok: true }); }));
+  r.post('/users/:id/deactivate', withCtx((ctx, req, res) => { deactivateUser(ctx, req.params.id!); res.json({ ok: true }); }));
+
+  // ---- signature ----
+  r.get('/signature', withCtx((ctx, _q, res) => res.json(signatureStatus(ctx))));
+  r.post('/signature', withCtx((ctx, req, res) => res.json(setSignature(ctx, req.body))));
+
+  // ---- backup & restore ----
+  r.get('/backup/status', withCtx((_ctx, _q, res) => res.json(backupStatus(db))));
+  r.post('/backup', withCtx((ctx, req, res) => {
+    if (ctx.userRole !== 'OWNER') throw new AppError('Only the owner can create backups.', 403);
+    const buf = createBackup(db, req.body.passphrase);
+    audit(ctx, 'backup.created', 'backup', 'local');
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="kitabu-backup-${new Date().toISOString().slice(0, 10)}.kdb"`);
+    res.send(buf);
+  }));
+  r.post('/restore', (req, res) => {
+    const { passphrase, dataBase64 } = req.body;
+    if (!dataBase64) throw new AppError('Choose your backup file.');
+    res.json(restoreBackup(db, Buffer.from(dataBase64, 'base64'), passphrase ?? ''));
   });
 
   r.post('/setup', (req, res) => {
@@ -55,7 +95,7 @@ export function buildRouter(db: DB): Router {
     res.json(arrears(ctx, { propertyId: req.query.propertyId as string | undefined, period: req.query.period as string | undefined }))));
   r.get('/search', withCtx((ctx, req, res) => res.json(search(ctx, String(req.query.q ?? '')))));
   r.get('/sync/status', withCtx((ctx, _q, res) => res.json({ ...syncStatus(ctx), addresses: localAddresses(port) })));
-  r.get('/audit', withCtx((ctx, _q, res) => res.json(listAudit(ctx))));
+  r.get('/audit', withCtx((ctx, _q, res) => { requireFinancialRole(ctx); res.json(listAudit(ctx)); }));
 
   // ---- properties ----
   r.get('/properties', withCtx((ctx, _q, res) => res.json(listProperties(ctx))));
@@ -112,10 +152,10 @@ export function buildRouter(db: DB): Router {
     res.json(rec);
   }));
 
-  // ---- reports ----
-  r.get('/reports/collection', withCtx((ctx, req, res) => res.json(collectionReport(ctx, req.query.period as string | undefined))));
-  r.get('/reports/expenses', withCtx((ctx, req, res) => res.json(expenseReport(ctx, req.query.from as string | undefined, req.query.to as string | undefined))));
-  r.get('/reports/occupancy', withCtx((ctx, _q, res) => res.json(occupancyReport(ctx))));
+  // ---- reports (owner/manager only) ----
+  r.get('/reports/collection', withCtx((ctx, req, res) => { requireFinancialRole(ctx); res.json(collectionReport(ctx, req.query.period as string | undefined)); }));
+  r.get('/reports/expenses', withCtx((ctx, req, res) => { requireFinancialRole(ctx); res.json(expenseReport(ctx, req.query.from as string | undefined, req.query.to as string | undefined)); }));
+  r.get('/reports/occupancy', withCtx((ctx, _q, res) => { requireFinancialRole(ctx); res.json(occupancyReport(ctx)); }));
 
   // ============================ SYNC ============================
   // -- peer-facing endpoints (device-authenticated; used by OTHER devices) --

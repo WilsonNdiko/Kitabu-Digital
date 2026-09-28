@@ -20,9 +20,17 @@ export interface Stmt {
 export class Db {
   private db: DatabaseSync;
   private txDepth = 0;
+  /** File path of this database (':memory:' for tests) — used by backup. */
+  readonly path: string;
 
   constructor(path: string) {
     this.db = new DatabaseSync(path);
+    this.path = path;
+  }
+
+  /** Flush the WAL into the main file so the file on disk is complete. */
+  checkpoint(): void {
+    this.db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
   }
 
   exec(sql: string): void {

@@ -11,7 +11,7 @@ const PORT = Number(process.env.PORT || 4000);
 
 const db = openDb(DB_PATH);
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '64mb' })); // restore uploads carry a base64 backup file
 
 app.use('/api', buildRouter(db));
 

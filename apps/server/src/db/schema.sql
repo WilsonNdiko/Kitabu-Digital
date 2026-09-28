@@ -222,6 +222,21 @@ CREATE TABLE IF NOT EXISTS maintenance_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_maintenance_property ON maintenance_requests(property_id);
 
+CREATE TABLE IF NOT EXISTS signatures (
+  id TEXT PRIMARY KEY,
+  org_id TEXT NOT NULL,
+  property_id TEXT,                      -- NULL = organization-wide default
+  image_data TEXT NOT NULL,              -- data URL (png/jpeg), capped in service
+  sha256 TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT,
+  origin_device_id TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_signatures_org ON signatures(org_id, active);
+
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY,
   org_id TEXT NOT NULL,

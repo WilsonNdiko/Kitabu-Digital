@@ -7,6 +7,7 @@ import {
   AppError, audit, getSetting, insertRow, insertRowIfAbsent, nowIso, setSetting,
   todayIso, updateRow, type Ctx,
 } from '../db/index.js';
+import { getActiveSignature } from './signatures.js';
 
 // ---------------------------------------------------------------- billing --
 /** Idempotently ensure monthly rent charges exist for all tenancies (lazy, offline). */
@@ -212,6 +213,7 @@ export function issueReceipt(ctx: Ctx, paymentId: string) {
 
   const balanceAfter = tenancyBalance(ctx, info.tenancy_id);
   const issuedBy = (ctx.db.prepare('SELECT full_name FROM users WHERE id = ?').get(ctx.userId) as any)?.full_name ?? 'Unknown';
+  const signature = getActiveSignature(ctx, p.property_id); // frozen into the snapshot
 
   const id = newId('rcp');
   let receiptNo = '';
@@ -227,6 +229,7 @@ export function issueReceipt(ctx: Ctx, paymentId: string) {
       paymentDate: p.payment_date, period: periodOf(p.payment_date),
       previousBalanceMinor: balanceAfter + p.amount_minor,
       remainingBalanceMinor: balanceAfter,
+      signature: signature ? { dataUrl: signature.dataUrl, sha256: signature.sha256 } : null,
     };
     insertRow(ctx, 'receipts', {
       id, org_id: ctx.orgId, receipt_no: receiptNo, payment_id: paymentId,
