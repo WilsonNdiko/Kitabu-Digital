@@ -1,0 +1,16 @@
+{
+  "name": "kitabu-digital",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Offline-first property management for Kenyan landlords",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm run test -w @kitabu/core && npm run test -w @kitabu/server",
+    "dev:server": "npm run dev -w @kitabu/server",
+    "dev:web": "npm run dev -w @kitabu/web",
+    "build": "npm run build -w @kitabu/web"
+  }
+}
