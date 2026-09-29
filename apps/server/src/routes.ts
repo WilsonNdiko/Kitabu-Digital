@@ -20,6 +20,7 @@ import { createUser, deactivateUser, isLocked, listUsers, lockDevice, lockScreen
 import { setSignature, signatureStatus } from './services/signatures.js';
 import { backupStatus, createBackup, restoreBackup } from './services/backup.js';
 import { importStatement, matchPendingPayments, statementStatus, verificationQueue } from './services/mpesa.js';
+import { askAssistant } from './services/assistant.js';
 
 export function buildRouter(db: DB): Router {
   const r = Router();
@@ -63,6 +64,9 @@ export function buildRouter(db: DB): Router {
   // ---- signature ----
   r.get('/signature', withCtx((ctx, _q, res) => res.json(signatureStatus(ctx))));
   r.post('/signature', withCtx((ctx, req, res) => res.json(setSignature(ctx, req.body))));
+
+  // ---- assistant (deterministic tools; AI never source of truth) ----
+  r.post('/assistant/ask', withCtx((ctx, req, res) => res.json(askAssistant(ctx, req.body.question))));
 
   // ---- M-Pesa verification (recording/verifying only — NEVER processing) ----
   r.get('/mpesa/queue', withCtx((ctx, _q, res) => { requireFinancialRole(ctx); res.json(verificationQueue(ctx)); }));

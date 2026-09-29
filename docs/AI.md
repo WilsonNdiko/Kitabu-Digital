@@ -37,3 +37,5 @@ Mutation flow: the AI *proposes* a fully-specified action → Kitabu renders a d
 
 - Core app never depends on the AI. Offline ⇒ the assistant panel shows "AI needs internet — everything else works normally."
 - A lightweight **offline command parser** (deterministic patterns, no LLM) handles simple phrases locally: "arrears", "vacant houses", "John statement" → routed to the same tools. No local LLM is shipped to budget devices.
+
+*Implementation status (Phase 7a ✅):* `services/assistant.ts` implements the offline parser + read-only tool registry (`get_arrears`, `get_collection`, `get_expense_summary`, `get_vacant_units`, `get_pending_verifications`, `get_open_maintenance`, `get_dashboard`, `get_tenant_statement`) over the same services the UI uses. English + common Swahili phrases ("Nani hajalipa?", "mwezi uliopita"), month parsing, tenant-name lookup. RBAC identical to the routes: a caretaker's assistant is refused org-wide financials. Unknown questions return help — never a generated figure. Cloud LLM provider over the same registry: Phase 7b ◻.

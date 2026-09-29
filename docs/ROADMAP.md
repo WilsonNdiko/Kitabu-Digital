@@ -53,6 +53,12 @@ Optional accounts, multi-tenant cloud API (Fastify + Postgres RLS), local→clou
   clearly separated, never faked) ◻
 - Recording/verifying only — never payment processing.
 
+## Phase 7 — AI Assistant (offline core ✅)
+- M7.1 Read-only tool registry over existing services + offline command parser (EN + Swahili
+  phrases, month parsing, tenant lookup), same RBAC as the UI, chat page "Ask Kitabu" ✅
+- M7.2 Cloud LLM provider over the SAME tool registry (provider abstraction, keys server-side) ◻
+- M7.3 Mutating tools with deterministic confirmation cards (propose → user taps → normal service) ◻
+
 ## Phase 7 — AI ◻
 Read-only tools → confirmation-gated mutations → offline command parser.
 

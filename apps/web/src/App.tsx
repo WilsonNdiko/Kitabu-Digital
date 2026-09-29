@@ -19,6 +19,7 @@ import Arrears from './pages/Arrears';
 import Reports from './pages/Reports';
 import SyncPage from './pages/SyncPage';
 import MpesaPage from './pages/MpesaPage';
+import AssistantPage from './pages/AssistantPage';
 import Staff from './pages/Staff';
 import SettingsPage from './pages/SettingsPage';
 import BackupPage from './pages/BackupPage';
@@ -60,6 +61,7 @@ export default function App() {
     { to: '/arrears', label: 'Arrears', ico: '📋' },
   ];
   const more = [
+    { to: '/ask', label: 'Ask Kitabu', ico: '💬' },
     { to: '/receipts', label: 'Receipts', ico: '🧾' },
     { to: '/expenses', label: 'Expenses', ico: '🧰' },
     { to: '/maintenance', label: 'Maintenance', ico: '🔧' },
@@ -118,6 +120,7 @@ export default function App() {
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/arrears" element={<Arrears />} />
+            <Route path="/ask" element={<AssistantPage />} />
             <Route path="/mpesa" element={<MpesaPage />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/sync" element={<SyncPage />} />
