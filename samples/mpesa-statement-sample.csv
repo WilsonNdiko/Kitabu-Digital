@@ -1,0 +1,9 @@
+M-PESA STATEMENT
+Customer Name,DEMO LANDLORD
+Period,01/09/2026 - 29/09/2026
+
+Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance
+TAB3XY9QL2,2026-09-06 09:10:00,"Funds received from - 254756789012, SAMUEL MWANGI",Completed,"8,500.00",,"53,120.00"
+QQZ7PL4WE1,2026-09-07 18:45:59,"Pay Bill to KPLC PREPAID",Completed,,"1,450.00","51,670.00"
+XYZ4AB7CD1,2026-09-10 11:02:33,"Funds received from - 254700111222, VISITOR NOT A TENANT",Completed,"3,000.00",,"54,670.00"
+ZXC9VB8NM7,2026-09-12 08:00:00,"Funds received from - 254733999888, FAILED ATTEMPT",Failed,"5,000.00",,
