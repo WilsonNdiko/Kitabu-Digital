@@ -19,6 +19,7 @@ import { audit, getSetting, nowIso, updateRow } from './db/index.js';
 import { createUser, deactivateUser, isLocked, listUsers, lockDevice, lockScreenUsers, loginUser, setUserPin } from './services/users.js';
 import { setSignature, signatureStatus } from './services/signatures.js';
 import { backupStatus, createBackup, restoreBackup } from './services/backup.js';
+import { importStatement, matchPendingPayments, statementStatus, verificationQueue } from './services/mpesa.js';
 
 export function buildRouter(db: DB): Router {
   const r = Router();
@@ -62,6 +63,15 @@ export function buildRouter(db: DB): Router {
   // ---- signature ----
   r.get('/signature', withCtx((ctx, _q, res) => res.json(signatureStatus(ctx))));
   r.post('/signature', withCtx((ctx, req, res) => res.json(setSignature(ctx, req.body))));
+
+  // ---- M-Pesa verification (recording/verifying only — NEVER processing) ----
+  r.get('/mpesa/queue', withCtx((ctx, _q, res) => { requireFinancialRole(ctx); res.json(verificationQueue(ctx)); }));
+  r.get('/mpesa/status', withCtx((ctx, _q, res) => { requireFinancialRole(ctx); res.json(statementStatus(ctx)); }));
+  r.post('/mpesa/statement', withCtx((ctx, req, res) => res.json(importStatement(ctx, req.body.csvText))));
+  r.post('/mpesa/match', withCtx((ctx, _q, res) => {
+    requireFinancialRole(ctx);
+    res.json(matchPendingPayments(ctx));
+  }));
 
   // ---- backup & restore ----
   r.get('/backup/status', withCtx((_ctx, _q, res) => res.json(backupStatus(db))));

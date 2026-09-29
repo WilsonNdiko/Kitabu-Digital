@@ -18,6 +18,7 @@ import Maintenance from './pages/Maintenance';
 import Arrears from './pages/Arrears';
 import Reports from './pages/Reports';
 import SyncPage from './pages/SyncPage';
+import MpesaPage from './pages/MpesaPage';
 import Staff from './pages/Staff';
 import SettingsPage from './pages/SettingsPage';
 import BackupPage from './pages/BackupPage';
@@ -62,7 +63,10 @@ export default function App() {
     { to: '/receipts', label: 'Receipts', ico: '🧾' },
     { to: '/expenses', label: 'Expenses', ico: '🧰' },
     { to: '/maintenance', label: 'Maintenance', ico: '🔧' },
-    ...(role !== 'CARETAKER' ? [{ to: '/reports', label: 'Reports', ico: '📊' }] : []),
+    ...(role !== 'CARETAKER' ? [
+      { to: '/mpesa', label: 'M-Pesa Check', ico: '✅' },
+      { to: '/reports', label: 'Reports', ico: '📊' },
+    ] : []),
     { to: '/sync', label: 'Sync & Devices', ico: '🔄' },
     ...(role === 'OWNER' ? [
       { to: '/staff', label: 'Staff', ico: '🧑‍🤝‍🧑' },
@@ -114,6 +118,7 @@ export default function App() {
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/arrears" element={<Arrears />} />
+            <Route path="/mpesa" element={<MpesaPage />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/sync" element={<SyncPage />} />
             <Route path="/staff" element={<Staff meRole={role} />} />

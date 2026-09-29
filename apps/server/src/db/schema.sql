@@ -237,6 +237,25 @@ CREATE TABLE IF NOT EXISTS signatures (
 );
 CREATE INDEX IF NOT EXISTS idx_signatures_org ON signatures(org_id, active);
 
+-- Imported M-Pesa statement lines (docs/MPESA.md §2, statement-import provider).
+-- Evidence for verification — NEVER money movement. id is deterministic from
+-- (org, receipt_no) so the same line imported on two devices converges in sync.
+CREATE TABLE IF NOT EXISTS mpesa_statement_lines (
+  id TEXT PRIMARY KEY,
+  org_id TEXT NOT NULL,
+  receipt_no TEXT NOT NULL,              -- M-Pesa code e.g. SFR8K2L9QX
+  completed_at TEXT,                     -- completion time from the statement
+  details TEXT,                          -- e.g. "Funds received from 2547... JOHN KAMAU"
+  paid_in_minor INTEGER NOT NULL,        -- money IN only (cents)
+  imported_at TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT,
+  origin_device_id TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mpesa_lines_ref ON mpesa_statement_lines(org_id, receipt_no);
+
+
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY,
   org_id TEXT NOT NULL,

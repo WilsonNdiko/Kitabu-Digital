@@ -127,7 +127,7 @@ function ensureChargesForTenancy(ctx: Ctx, t: any): void {
 }
 
 /** The PAYMENT ledger entry is posted exactly when a payment becomes VERIFIED. */
-function postPaymentToLedger(ctx: Ctx, paymentId: string, tenancyId: string, amountMinor: number, date: string): void {
+export function postPaymentToLedger(ctx: Ctx, paymentId: string, tenancyId: string, amountMinor: number, date: string): void {
   insertRowIfAbsent(ctx, 'ledger_entries', {
     id: `led_pay_${paymentId.replace(/^pay_/, '')}`,   // deterministic: idempotent across devices
     org_id: ctx.orgId, tenancy_id: tenancyId, entry_type: 'PAYMENT',

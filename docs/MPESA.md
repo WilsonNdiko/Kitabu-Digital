@@ -47,6 +47,8 @@ interface PaymentVerificationProvider {
 
 Offline behaviour: PENDING payments queue for verification; when a provider becomes available, matching runs and statuses update — the recording flow never blocks on connectivity.
 
+*Implementation status:* **manual** and **statement-import** are live. Statement lines are stored in `mpesa_statement_lines` with ids deterministic in `(org, receipt_no)`, so the same statement imported on two devices converges in sync with no duplicates. Auto-verification requires reference **and** exact amount to agree; amount mismatches are flagged in the M-Pesa Check queue and are never auto-resolved. Re-import is idempotent (no double ledger posts). The audit log records `provider: 'statement-import'` plus the matched line on every auto-verification.
+
 ## 3. Rules
 
 1. A syntactically valid reference is *evidence*, not *proof* — always lands as PENDING.

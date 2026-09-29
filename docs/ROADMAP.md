@@ -45,8 +45,13 @@ Design docs in `docs/` (PRD, architecture + tech decision, database, sync, secur
 ## Phase 5 — Cloud ◻
 Optional accounts, multi-tenant cloud API (Fastify + Postgres RLS), local→cloud migration, multi-device sync, backup, device recovery.
 
-## Phase 6 — M-Pesa verification ◻
-Statement import matching → Daraja transaction-status provider (sandbox first, clearly separated) → review queue. Recording/verifying only — never payment processing.
+## Phase 6 — M-Pesa verification (statement import ✅)
+- M6.1 Statement-import provider: CSV parse (real export shape + simple sheets), deterministic
+  synced statement lines, auto-verify on reference+amount match, mismatch review queue,
+  idempotent re-import, audit records provider evidence ✅
+- M6.2 Daraja transaction-status provider (query-only, landlord's own shortcode; sandbox first,
+  clearly separated, never faked) ◻
+- Recording/verifying only — never payment processing.
 
 ## Phase 7 — AI ◻
 Read-only tools → confirmation-gated mutations → offline command parser.
